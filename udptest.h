@@ -6,6 +6,7 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <winsock2.h>
 
 class UdpTest : public QWidget
 {
