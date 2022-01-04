@@ -6,7 +6,10 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <winsock2.h>
+
+#include <QString>
+#include <QThread>
+#include "workthread.h"
 
 class UdpTest : public QWidget
 {
@@ -14,6 +17,8 @@ class UdpTest : public QWidget
 public:
     UdpTest(QWidget* parent=nullptr);
     ~UdpTest();
+    void recvTest();
+    void threadTest();
 private:
     QPushButton* sendBut;
     QPushButton* sendBut10;
@@ -21,6 +26,9 @@ private:
     QTextEdit* inputText;
     QVBoxLayout* layout1;
     QHBoxLayout* layout2;
+    WorkThread* task;//testThread
+public slots:
+    void appendTextSlot(QString str);
 };
 
 #endif // UDPTEST_H

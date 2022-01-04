@@ -24,15 +24,19 @@ SOURCES += \
     mainwindow.cpp \
     serialport.cpp \
     tcptest.cpp \
-    udptest.cpp
+    udptest.cpp \
+    workthread.cpp
 
 HEADERS += \
     mainwindow.h \
     serialport.h \
     tcptest.h \
-    udptest.h
+    udptest.h \
+    workthread.h
 
 INCLUDEPATH += tmp/moc/release_shared
+
+LIBS += -lWs2_32
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
