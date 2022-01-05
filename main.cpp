@@ -2,6 +2,8 @@
 #include "serialport.h"
 #include "tcptest.h"
 #include "udptest.h"
+#include "multithreadtest.h"
+#include "completionporttest.h"
 
 #include <QApplication>
 #include <QWidget>
@@ -59,6 +61,14 @@ int main(int argc, char *argv[])
     QPushButton mwbut4(&mw);
     mwbut4.setGeometry(50,200,100,50);
     mwbut4.setText("udp测试");
+
+    QPushButton mwbut5(&mw);
+    mwbut5.setGeometry(50,250,100,50);
+    mwbut5.setText("多线程测试");
+
+    QPushButton mwbut6(&mw);
+    mwbut6.setGeometry(50,250,100,50);
+    mwbut6.setText("完成端口测试");
 
     mw.show();
     QWidget widget;
@@ -131,6 +141,11 @@ int main(int argc, char *argv[])
     //udp测试
     UdpTest widget4;
 
+    //多线程测试
+    MultiThreadTest widget5;
+
+    //完成端口测试
+    CompletionPortTest widget6;
 
     //添加信号和槽机制，当某个结点被点击时，调整所有子结点的选中状态，同时将所有子结点展开。
     QObject::connect(&treeWidget,&QTreeWidget::itemClicked,&widget1,&MyWidget::treeWidgetClicked);
@@ -140,6 +155,8 @@ int main(int argc, char *argv[])
     QObject::connect(&mwbut2,&QPushButton::clicked,&widget2,&QWidget::show);
     QObject::connect(&mwbut3,&QPushButton::clicked,&widget3,&QWidget::show);
     QObject::connect(&mwbut4,&QPushButton::clicked,&widget4,&QWidget::show);
+    QObject::connect(&mwbut5,&QPushButton::clicked,&widget5,&QWidget::show);
+    QObject::connect(&mwbut6,&QPushButton::clicked,&widget6,&QWidget::show);
     return a.exec();
 }
 //MyWidget类的定义应该放到 .h 文件中，本例中将其写到 main.cpp 中，程序最后需要添加 #include "当前源文件名.moc" 语句，否则无法通过编译。
