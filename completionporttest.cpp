@@ -11,10 +11,11 @@ CompletionPortTest::CompletionPortTest(QWidget *parent) : QWidget(parent)
     //根据CPU数量创建两倍的线程
     int m_nThreads = 2 * m_nProcessors;
     HANDLE* m_phWorkerThreads = new HANDLE[m_nThreads];
-//    for(int i = 0; i < m_nThreads; i++){
-//        m_phWorkerThreads[i] = CreateThread(0,0,_WorkerThread,nullptr,0,nullptr);
-//    }
+    for(int i = 0; i < m_nThreads; i++){
+        m_phWorkerThreads[i] = CreateThread(0,0,_WorkerThread,nullptr,0,nullptr);
+    }
     //创建一个用于监听的socket，绑定到完成端口上，在指定的端口上监听连接请求
+
 }
 
 CompletionPortTest::~CompletionPortTest(){
