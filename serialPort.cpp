@@ -1,4 +1,4 @@
-#include "serialport.h"
+﻿#include "serialport.h"
 
 #include <QDebug>
 #include <QLayout>

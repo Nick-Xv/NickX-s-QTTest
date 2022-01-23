@@ -1,4 +1,4 @@
-#include "multithreadtest.h"
+﻿#include "multithreadtest.h"
 
 const int NAME_LINE = 40;
 

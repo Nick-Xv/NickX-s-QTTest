@@ -1,4 +1,4 @@
-#include "completionporttest.h"
+﻿#include "completionporttest.h"
 
 //每个处理器上产生多少个线程()
 #define WORKER_THREADS_PER_PROCESSOR 2
@@ -15,7 +15,7 @@
 //释放Socket宏
 #define RELEASE_SOCKET(x) {if((x)!=INVALID_SOCKET){closesocket(x);x=INVALID_SOCKET;}}
 
-CIOCPModel::CIOCPModel():
+CIOCPModel::CIOCPModel(): 
     m_nThreads(0),
     m_hShutdownEvent(nullptr),
     m_hIOCompletionPort(nullptr),
@@ -50,12 +50,15 @@ DWORD WINAPI CIOCPModel::_WorkerThread(LPVOID lpParam){
         BOOL bReturn = GetQueuedCompletionStatus(
                     pIOCPModel->m_hIOCompletionPort,
                     &dwBytesTransfered,
-                    reinterpret_cast<PULONG_PTR>(&pSocketContext),
+                    (PULONG_PTR)&pSocketContext,
                     &pOverlapped,
                     INFINITE
                     );
+		qDebug() << "!!!" << pSocketContext << endl;
+		qDebug() << sizeof(DWORD) << endl;
+		qDebug() << sizeof(pSocketContext) << endl;
         //收到退出标志则退出
-        if(EXIT_CODE==reinterpret_cast<DWORD>(pSocketContext))break;
+        if(EXIT_CODE==reinterpret_cast<ULONG_PTR>(pSocketContext))break;
         //判断是否出现错误
         if(!bReturn){
             DWORD dwErr = GetLastError();
@@ -65,6 +68,7 @@ DWORD WINAPI CIOCPModel::_WorkerThread(LPVOID lpParam){
             continue;
         }
         else{
+			//qDebug() << pOverlapped << endl;
             //读取传入的参数
             PER_IO_CONTEXT* pIoContext = CONTAINING_RECORD(pOverlapped,PER_IO_CONTEXT,m_Overlapped);
 
@@ -78,6 +82,7 @@ DWORD WINAPI CIOCPModel::_WorkerThread(LPVOID lpParam){
                 continue;
             }
             else{
+				//qDebug() << "!!!!" << pSocketContext->m_ClientAddr.sin_addr.S_un.S_addr << endl;
                 switch(pIoContext->m_OpType){
                     //accept
                 case ACCEPT_POSTED:{
@@ -89,10 +94,7 @@ DWORD WINAPI CIOCPModel::_WorkerThread(LPVOID lpParam){
                 }
                     break;
                 case SEND_POSTED:{
-                    PER_IO_CONTEXT *pSend = pSocketContext->GetNewIoContext();
-                    pSend->m_sockAccept = pSocketContext->m_Socket;
-                    memcpy(pSend->m_szBuffer, pIoContext->m_szBuffer, dwBytesTransfered);
-                    pIOCPModel->_PostSend(pSend);
+                    //qDebug()<<"你有问题啊"<<endl;
                 }
                     break;
                 default:
@@ -102,7 +104,7 @@ DWORD WINAPI CIOCPModel::_WorkerThread(LPVOID lpParam){
             }
         }
     }
-    qDebug()<<"工作者线程 "<<nThreadNo<<"号退出"<<endl;
+    qDebug()<<"工作者线程 "<<nThreadNo<<"号退出 "<<endl;
     RELEASE(lpParam);
     return 0;
 }
@@ -122,7 +124,7 @@ bool CIOCPModel::Start(){
     //初始化线程互斥量
     InitializeCriticalSection(&m_csContextList);
     //建立系统退出的事件通知
-    m_hShutdownEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    m_hShutdownEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
     //init IOCP
     if(false == _InitializeIOCP()){
         qDebug()<<"IOCP init fail"<<endl;
@@ -165,9 +167,9 @@ void CIOCPModel::Stop(){
 bool CIOCPModel::_InitializeIOCP()
 {
     // 建立第一个完成端口
-    m_hIOCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0 );
+    m_hIOCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0 );
 
-    if ( NULL == m_hIOCompletionPort)
+    if ( nullptr == m_hIOCompletionPort)
     {
         qDebug()<<"建立完成端口失败！错误代码: "<<WSAGetLastError()<<endl;
         return false;
@@ -219,7 +221,7 @@ bool CIOCPModel::_InitializeListenSocket(){
     }
 
     //将Listen Socket绑定至完成端口中
-    if(nullptr == CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_pListenContext->m_Socket), m_hIOCompletionPort,reinterpret_cast<DWORD>(m_pListenContext), 0))
+    if(nullptr == CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_pListenContext->m_Socket), m_hIOCompletionPort,reinterpret_cast<ULONG_PTR>(m_pListenContext), 0))
     {
         qDebug()<<"绑定 Listen Socket至完成端口失败！错误代码: "<<WSAGetLastError()<<endl;
         RELEASE_SOCKET( m_pListenContext->m_Socket );
@@ -270,8 +272,8 @@ bool CIOCPModel::_InitializeListenSocket(){
                 &m_lpfnAcceptEx,
                 sizeof(m_lpfnAcceptEx),
                 &dwBytes,
-                NULL,
-                NULL
+                nullptr,
+                nullptr
                 )){
         qDebug()<<"WSAIoctl 未能获取AcceptEx函数指针。错误代码: "<<WSAGetLastError()<<endl;
         this->_DeInitialize();
@@ -287,8 +289,8 @@ bool CIOCPModel::_InitializeListenSocket(){
         &m_lpfnGetAcceptExSockAddrs,
         sizeof(m_lpfnGetAcceptExSockAddrs),
         &dwBytes,
-        NULL,
-        NULL))
+        nullptr,
+        nullptr))
     {
         qDebug()<<"WSAIoctl 未能获取GuidGetAcceptExSockAddrs函数指针。错误代码: "<<WSAGetLastError()<<endl;
         this->_DeInitialize();
@@ -374,15 +376,14 @@ bool CIOCPModel::_PostAccept( PER_IO_CONTEXT* pAcceptIoContext )
 
 // 在有客户端连入的时候，进行处理
 bool CIOCPModel::_DoAccept( PER_SOCKET_CONTEXT* pSocketContext, PER_IO_CONTEXT* pIoContext ){
-    SOCKADDR_IN* ClientAddr = NULL;
-    SOCKADDR_IN* LocalAddr = NULL;
+    SOCKADDR_IN* ClientAddr = nullptr;
+    SOCKADDR_IN* LocalAddr = nullptr;
     int remoteLen = sizeof(SOCKADDR_IN), localLen = sizeof(SOCKADDR_IN);
     // 1. 首先取得连入客户端的地址信息
     this->m_lpfnGetAcceptExSockAddrs(pIoContext->m_wsaBuf.buf, pIoContext->m_wsaBuf.len - ((sizeof(SOCKADDR_IN)+16)*2),
             sizeof(SOCKADDR_IN)+16, sizeof(SOCKADDR_IN)+16, (LPSOCKADDR*)&LocalAddr, &localLen, (LPSOCKADDR*)&ClientAddr, &remoteLen);
-
-    qDebug()<<"客户端 "<<inet_ntoa(ClientAddr->sin_addr)<<":"<<ntohs(ClientAddr->sin_port)<<" 连入."<<endl;
-    qDebug()<<"客户端 "<<inet_ntoa(ClientAddr->sin_addr)<<":"<<ntohs(ClientAddr->sin_port)<<" 信息："<<pIoContext->m_wsaBuf.buf<<endl;
+    qDebug()<<"客户端 "<<inet_ntoa(ClientAddr->sin_addr)<<":"<<ntohs(ClientAddr->sin_port)<<" 连入. "<<endl;
+    qDebug()<<"客户端 "<<inet_ntoa(ClientAddr->sin_addr)<<":"<<ntohs(ClientAddr->sin_port)<<" 信息： "<<pIoContext->m_wsaBuf.buf<<endl;
 
     // 2. 这里需要注意，这里传入的这个是ListenSocket上的Context，这个Context我们还需要用于监听下一个连接
     // 所以我还得要将ListenSocket上的Context复制出来一份为新连入的Socket新建一个SocketContext
@@ -430,13 +431,13 @@ bool CIOCPModel::_PostRecv( PER_IO_CONTEXT* pIoContext )
     pIoContext->ResetBuffer();
     pIoContext->m_OpType = RECV_POSTED;
 
-    // 初始化完成后，，投递WSARecv请求
-    int nBytesRecv = WSARecv( pIoContext->m_sockAccept, p_wbuf, 1, &dwBytes, &dwFlags, p_ol, NULL );
+    // 初始化完成后，投递WSARecv请求
+    int nBytesRecv = WSARecv( pIoContext->m_sockAccept, p_wbuf, 1, &dwBytes, &dwFlags, p_ol, nullptr );
 
     // 如果返回值错误，并且错误的代码并非是Pending的话，那就说明这个重叠请求失败了
     if ((SOCKET_ERROR == nBytesRecv) && (WSA_IO_PENDING != WSAGetLastError()))
     {
-        qDebug()<<"投递第一个WSARecv失败！"<<endl;
+        qDebug()<<"投递第一个WSARecv失败！ "<<endl;
         return false;
     }
     return true;
@@ -453,13 +454,13 @@ bool CIOCPModel::_PostSend(PER_IO_CONTEXT* pIoContext)
     //pIoContext->ResetBuffer();
     pIoContext->m_OpType = SEND_POSTED;
 
-    // 初始化完成后，，投递WSARecv请求
-    int nBytesRecv = WSASend(pIoContext->m_sockAccept, p_wbuf, 1, &dwBytes, dwFlags, p_ol, NULL);
+    // 初始化完成后，投递WSASend请求
+    int nBytesRecv = WSASend(pIoContext->m_sockAccept, p_wbuf, 1, &dwBytes, dwFlags, p_ol, nullptr);
 
     // 如果返回值错误，并且错误的代码并非是Pending的话，那就说明这个重叠请求失败了
     if ((SOCKET_ERROR == nBytesRecv) && (WSA_IO_PENDING != WSAGetLastError()))
     {
-        qDebug()<<"投递第一个WSARecv失败！"<<endl;
+        qDebug()<<"投递WSASend失败！ "<<endl;
         return false;
     }
     return true;
@@ -469,8 +470,12 @@ bool CIOCPModel::_PostSend(PER_IO_CONTEXT* pIoContext)
 bool CIOCPModel::_DoRecv( PER_SOCKET_CONTEXT* pSocketContext, PER_IO_CONTEXT* pIoContext )
 {
     // 先把上一次的数据显示出现，然后就重置状态，发出下一个Recv请求
-    SOCKADDR_IN* ClientAddr = &pSocketContext->m_ClientAddr;
-    qDebug()<<"收到  "<<inet_ntoa(ClientAddr->sin_addr)<<":"<<ntohs(ClientAddr->sin_port)<<" 信息："<<pIoContext->m_wsaBuf.buf<<endl;
+	SOCKADDR_IN ClientAddr;
+	qDebug() << pSocketContext << endl;
+	qDebug() << pSocketContext->m_Socket << endl;
+	qDebug() << pSocketContext->m_ClientAddr.sin_port << endl;
+	ClientAddr = pSocketContext->m_ClientAddr;
+    qDebug()<<"收到  "<<inet_ntoa(ClientAddr.sin_addr)<<":"<<ntohs(ClientAddr.sin_port)<<" 信息： "<<pIoContext->m_wsaBuf.buf<<endl;
 
     // 然后开始投递下一个WSARecv请求
     return _PostRecv( pIoContext );
@@ -480,11 +485,11 @@ bool CIOCPModel::_DoRecv( PER_SOCKET_CONTEXT* pSocketContext, PER_IO_CONTEXT* pI
 bool CIOCPModel::_AssociateWithIOCP( PER_SOCKET_CONTEXT *pContext )
 {
     // 将用于和客户端通信的SOCKET绑定到完成端口中
-    HANDLE hTemp = CreateIoCompletionPort((HANDLE)pContext->m_Socket, m_hIOCompletionPort, (DWORD)pContext, 0);
+    HANDLE hTemp = CreateIoCompletionPort((HANDLE)pContext->m_Socket, m_hIOCompletionPort, (ULONG_PTR)pContext, 0);
 
     if (nullptr == hTemp)
     {
-        qDebug()<<"执行CreateIoCompletionPort()出现错误.错误代码："<<GetLastError()<<endl;
+        qDebug()<<"执行CreateIoCompletionPort()出现错误.错误代码： "<<GetLastError()<<endl;
         return false;
     }
 
@@ -493,12 +498,15 @@ bool CIOCPModel::_AssociateWithIOCP( PER_SOCKET_CONTEXT *pContext )
 
 CompletionPortTest::CompletionPortTest(QWidget *parent) : QWidget(parent)
 {
-    this->resize(500,500);
+    this->resize(500,700);
     but1 = new QPushButton(this);
     but1->setText("开始监听");
     but2 = new QPushButton(this);
     but2->setText("结束监听");
+    but3 = new QPushButton(this);
+    but3->setText("发送数据");
     text1 = new QTextEdit(this);
+    text2 = new QTextEdit(this);
     layout1 = new QVBoxLayout(this);
     layout2 = new QHBoxLayout;
 
@@ -507,7 +515,9 @@ CompletionPortTest::CompletionPortTest(QWidget *parent) : QWidget(parent)
 
     layout2->addWidget(but1,1);
     layout2->addWidget(but2,1);
+    layout2->addWidget(but3,1);
     layout1->addLayout(layout2,1);
+    layout1->addWidget(text2,1);
     layout1->addWidget(text1,5);
 
     if( false==m_IOCP.LoadSocketLib() ){
@@ -519,6 +529,7 @@ CompletionPortTest::CompletionPortTest(QWidget *parent) : QWidget(parent)
 
     connect(but1,&QPushButton::clicked,this,&CompletionPortTest::but1OnClick);
     connect(but2,&QPushButton::clicked,this,&CompletionPortTest::but2OnClick);
+    connect(but3,&QPushButton::clicked,this,&CompletionPortTest::but3OnClick);
 }
 
 CompletionPortTest::~CompletionPortTest(){
@@ -654,4 +665,34 @@ void CompletionPortTest::but1OnClick(){
 
 void CompletionPortTest::but2OnClick(){
     m_IOCP.Stop();
+}
+
+void CompletionPortTest::but3OnClick(){
+    m_IOCP.SendData();
+}
+
+void CIOCPModel::SendData(){
+    //取一个socket
+    PER_SOCKET_CONTEXT* temp = nullptr;
+    if(!m_arrayClientContext.empty()){
+        temp = m_arrayClientContext[0];
+    }
+    else{
+        qDebug()<<"no socket"<<endl;
+        return;
+    }
+
+    //创建一个iocontext
+    PER_IO_CONTEXT* pNewIoContext = temp->GetNewIoContext();
+    pNewIoContext->m_OpType       = SEND_POSTED;
+    pNewIoContext->m_sockAccept   = temp->m_Socket;
+    strcpy(pNewIoContext->m_szBuffer,"test");
+    qDebug()<<pNewIoContext->m_szBuffer<<endl;
+    qDebug()<<"!!!"<<endl;
+    // 绑定完毕之后，就可以开始在这个Socket上投递完成请求了
+    if( false==this->_PostSend(pNewIoContext) )
+    {
+        temp->RemoveContext( pNewIoContext );
+        return;
+    }
 }

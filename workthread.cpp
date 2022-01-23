@@ -1,4 +1,4 @@
-#include "workthread.h"
+﻿#include "workthread.h"
 #include <QDebug>
 #include "udptest.h"
 
@@ -84,7 +84,7 @@ void WorkThread::run(){
         }
         if(SelectRcv>0){
             memset(dataBuf, 0, sizeof(char) * 1024);
-            nResult = recvfrom(s,dataBuf,nBufLen,0,reinterpret_cast<SOCKADDR*>(&sRecvAddr),
+            nResult = recvfrom(s,dataBuf,nBufLen,0,reinterpret_cast<SOCKADDR*>(&sSendAddr),
                                &nSenderAddrSize);
             if(nResult == SOCKET_ERROR){
                 qDebug("recvfrom failed:%d\n", WSAGetLastError());

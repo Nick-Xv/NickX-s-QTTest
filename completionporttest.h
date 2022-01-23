@@ -1,15 +1,13 @@
-#ifndef COMPLETIONPORTTEST_H
-#define COMPLETIONPORTTEST_H
-
+﻿#pragma once
 #include <QWidget>
 #include <QDebug>
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 #include <vector>
 #include <QString>
 #include <mswsock.h>
 #include <QDebug>
-#include <ntdef.h>
+//#include <ntdef.h>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QHBoxLayout>
@@ -122,6 +120,8 @@ public:
     QString GetLocalIP();//获取本机ip
     void SetPort(const int& nPort){m_nPort = nPort;}
 
+    void SendData();//发送数据
+
 protected:
     bool _InitializeIOCP();//init iocp
     bool _InitializeListenSocket();//init socket
@@ -169,7 +169,9 @@ public:
 private:
     QPushButton* but1;
     QPushButton* but2;
+    QPushButton* but3;
     QTextEdit* text1;
+    QTextEdit* text2;
     QVBoxLayout* layout1;
     QHBoxLayout* layout2;
     CIOCPModel m_IOCP;//完成端口模型
@@ -180,6 +182,5 @@ public slots:
     void appendTextSlot(QString str);
     void but1OnClick();
     void but2OnClick();
+    void but3OnClick();
 };
-
-#endif // COMPLETIONPORTTEST_H
