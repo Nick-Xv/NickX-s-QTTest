@@ -21,6 +21,34 @@ const int MAX_POST_ACCEPT1 = THREAD_NUMBER / 2;
 char*** createBufferArray() {
 	char*** arr;
 	arr = new char**[THREAD_NUMBER];
+	//分配空间
+	for (int i = 0; i < THREAD_NUMBER; i++) {
+		arr[i] = new char*[BUFFER_TEMP_LEN1];
+		for (int j = 0; j < BUFFER_TEMP_LEN1; j++) {
+			arr[i][j] = new char[MAX_BUFFER_LEN1];
+		}
+	}
+	//初始化
+	for (int i = 0; i < THREAD_NUMBER; i++) {
+		for (int j = 0; j < BUFFER_TEMP_LEN1; j++) {
+			for (int k = 0; k < MAX_BUFFER_LEN1; k++) {
+				*(*(*(arr + i) + j) + k) = 0;
+			}
+		}
+	}
+	return arr;
+}
+
+void deleteBufferArray(char*** arr) {
+	for (int i = 0; i < THREAD_NUMBER; i++) {
+		for (int j = 0; j < BUFFER_TEMP_LEN1; j++) {
+			delete[]arr[i][j];
+		}
+	}
+	for (int i = 0; i < THREAD_NUMBER; i++) {
+		delete[]arr[i];
+	}
+	delete[]arr;
 }
 
 IocpServer::CIOCPModel1::CIOCPModel1(IocpServer* parent) :
@@ -38,19 +66,24 @@ IocpServer::CIOCPModel1::CIOCPModel1(IocpServer* parent) :
 	qRegisterMetaType<SERVICE_TYPE>("SERVICE_TYPE");
 	qRegisterMetaType<PER_IO_CONTEXT1>("PER_IO_CONTEXT1");
 	qRegisterMetaType<WSABUF>("WSABUF");
+	bufferPtr = createBufferArray();
 }
 
 IocpServer::CIOCPModel1::~CIOCPModel1()
 {
 	// 确保资源彻底释放
 	this->Stop();
+	deleteBufferArray(bufferPtr);
 }
 
 //WorkerThread
 DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 	THREADPARAMS_WORKER1* pParam = static_cast<THREADPARAMS_WORKER1*>(lpParam);
 	CIOCPModel1* pIOCPModel = static_cast<CIOCPModel1*>(pParam->pIOCPModel);
+	//线程编号
 	int nThreadNo = static_cast<int>(pParam->nThreadNo);
+	//当前缓冲区编号
+	int curBufNo = 0;
 	//显示信息
 	qDebug() << "workerthread start " << nThreadNo << endl;
 
@@ -91,6 +124,8 @@ DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 				continue;
 			}
 			else {
+				//拷贝当前缓冲区内容到三维数组特定位置
+				memcpy(pIOCPModel->bufferPtr[nThreadNo-1][curBufNo], pIoContext->m_szBuffer, MAX_BUFFER_LEN1);
 				switch (pIoContext->m_OpType) {
 					//accept
 				case ACCEPT_POST: {
@@ -106,7 +141,7 @@ DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 				}
 				break;
 				case RECVFROM_POST: {
-					pIOCPModel->_DoRecvFrom(pIoContext);
+					pIOCPModel->_DoRecvFrom(pIoContext, nThreadNo-1, curBufNo);
 				}
 				break;
 				case SENDTO_POST: {
@@ -117,6 +152,8 @@ DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 				qDebug() << "_WorkThread中的 pIoContext->m_OpType 参数异常" << endl;
 				break;
 				}
+				//当前缓冲区第二维指针+1
+				curBufNo = (curBufNo + 1) % BUFFER_TEMP_LEN1;
 			}
 		}
 	}
@@ -579,24 +616,24 @@ bool IocpServer::CIOCPModel1::_PostRecvFrom(PER_IO_CONTEXT1* pIoContext) {
 	return true;
 }
 
-bool IocpServer::CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext) {
+bool IocpServer::CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threadNo, int curBufNo) {
 	// 先把上一次的数据显示出现，然后就重置状态，发出下一个Recv请求
 	SOCKADDR_IN* ClientAddr = &pIoContext->remoteAddr;
-	qDebug() << "收到" << inet_ntoa(ClientAddr->sin_addr) << ":" << ntohs(ClientAddr->sin_port) << " 信息： " << pIoContext->m_wsaBuf.buf << endl;
-	qDebug() << (int)*pIoContext->m_wsaBuf.buf << endl;
+	qDebug() << "收到" << inet_ntoa(ClientAddr->sin_addr) << ":" << ntohs(ClientAddr->sin_port) << " 信息： " << this->bufferPtr[threadNo][curBufNo] << endl;
+	//qDebug() << (int)*pIoContext->m_wsaBuf.buf << endl;
 
-	qDebug() << (int)pIoContext->m_wsaBuf.buf[0] << endl;
-	qDebug() << (int)pIoContext->m_wsaBuf.buf[1] << endl;
-	qDebug() << (int)pIoContext->m_wsaBuf.buf[2] << endl;
-	qDebug() << (int)pIoContext->m_wsaBuf.buf[3] << endl;
-	qDebug() << (int)pIoContext->m_wsaBuf.buf[4] << endl;
+	//qDebug() << (int)pIoContext->m_wsaBuf.buf[0] << endl;
+	//qDebug() << (int)pIoContext->m_wsaBuf.buf[1] << endl;
+	//qDebug() << (int)pIoContext->m_wsaBuf.buf[2] << endl;
+	//qDebug() << (int)pIoContext->m_wsaBuf.buf[3] << endl;
+	//qDebug() << (int)pIoContext->m_wsaBuf.buf[4] << endl;
 	//对收到的数据进行处理
 	//PER_IO_CONTEXT1 temp = *pIoContext;
 	//m_tempContextArray.push_back(temp);
-	char temp[8192];
-	memcpy(temp, pIoContext->m_szBuffer, 8192);
+	//char temp[8192];
+	//memcpy(temp, pIoContext->m_szBuffer, 8192);
 	//WSABUF temp = (WSABUF)pIoContext->m_wsaBuf;
-	emit parent->serviceHandler(pIoContext, temp);
+	emit parent->serviceHandler(pIoContext, this->bufferPtr[threadNo][curBufNo]);
 
 	// 然后开始投递下一个WSARecv请求
 	return _PostRecvFrom(pIoContext);

@@ -150,7 +150,7 @@ public:
 		bool _PostSend(PER_IO_CONTEXT1* pIoContext);//投递发送tcp数据请求
 
 		bool _PostRecvFrom(PER_IO_CONTEXT1* pIoContext);//投递udp接收数据请求
-		bool _DoRecvFrom(PER_IO_CONTEXT1* pIoContext);//处理udp数据到达请求
+		bool _DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threadNo, int curBufNo);//处理udp数据到达请求
 		bool _PostSendTo(PER_IO_CONTEXT1* pIoContext);//投递发送udp数据请求
 
 		bool _DoAccept(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* pIoContext);//客户端连入处理
@@ -163,8 +163,6 @@ public:
 		bool HandleError(PER_SOCKET_CONTEXT1* pContext, const DWORD& dwErr);//处理完成端口上的错误
 		static DWORD WINAPI _WorkerThread(LPVOID lpParam);//线程函数
 		bool _IsSocketAlive(SOCKET s);//判断socket是否已断开
-
-		void saveBuffer();
 
 	private:
 		HANDLE m_hShutdownEvent;//通知线程系统退出的事件，为了更好的退出线程
@@ -186,6 +184,9 @@ public:
 
 		//指向外部类的指针
 		IocpServer* parent;
+
+		//缓冲区三维数组指针
+		char*** bufferPtr;
 	};
 signals:
 	void serviceHandler(PER_IO_CONTEXT1* pIoContext, char* buff);
