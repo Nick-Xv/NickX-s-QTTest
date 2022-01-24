@@ -83,6 +83,12 @@
     <QtMoc Include="workthread.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="IocpServer.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="UdpChatService.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="debug\moc_predefs.h.cbt">
@@ -94,12 +100,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MySqlHandler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="UdpChatService.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="IocpServer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

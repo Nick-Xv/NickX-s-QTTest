@@ -12,6 +12,7 @@ public:
 	~MySqlHandler();
 	bool connectDb();
 	bool queryDb(QString query);
+	bool queryDb(QString query, QString& result);
 	void closeDb();
 private:
 	MYSQL* mysql;//mysql连接

@@ -2,9 +2,11 @@
 
 //每个处理器上产生多少个线程()
 const int WORKER_THREADS_PER_PROCESSOR1 = 2;
+//
+const int THREAD_NUMBER = WORKER_THREADS_PER_PROCESSOR1 * IocpServer::CIOCPModel1::_GetNoOfProcessors() + 2;
 //同时投递的accept请求的数量(灵活设置)
-const int THREAD_NUMBER = WORKER_THREADS_PER_PROCESSOR1 * CIOCPModel1::_GetNoOfProcessors() + 2;
 const int MAX_POST_ACCEPT1 = THREAD_NUMBER / 2;
+
 //传递给Worker线程的退出信号
 #define EXIT_CODE NULL
 
@@ -16,7 +18,12 @@ const int MAX_POST_ACCEPT1 = THREAD_NUMBER / 2;
 //释放Socket宏
 #define RELEASE_SOCKET(x) {if((x)!=INVALID_SOCKET){closesocket(x);x=INVALID_SOCKET;}}
 
-CIOCPModel1::CIOCPModel1() :
+char*** createBufferArray() {
+	char*** arr;
+	arr = new char**[THREAD_NUMBER];
+}
+
+IocpServer::CIOCPModel1::CIOCPModel1(IocpServer* parent) :
 	m_nThreads(THREAD_NUMBER),
 	m_hShutdownEvent(nullptr),
 	m_hIOCompletionPort(nullptr),
@@ -27,16 +34,20 @@ CIOCPModel1::CIOCPModel1() :
 	m_pListenContext(nullptr),
 	m_pListenContextUdp(nullptr)
 {
+	this->parent = parent;
+	qRegisterMetaType<SERVICE_TYPE>("SERVICE_TYPE");
+	qRegisterMetaType<PER_IO_CONTEXT1>("PER_IO_CONTEXT1");
+	qRegisterMetaType<WSABUF>("WSABUF");
 }
 
-CIOCPModel1::~CIOCPModel1()
+IocpServer::CIOCPModel1::~CIOCPModel1()
 {
 	// 确保资源彻底释放
 	this->Stop();
 }
 
 //WorkerThread
-DWORD WINAPI CIOCPModel1::_WorkerThread(LPVOID lpParam) {
+DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 	THREADPARAMS_WORKER1* pParam = static_cast<THREADPARAMS_WORKER1*>(lpParam);
 	CIOCPModel1* pIOCPModel = static_cast<CIOCPModel1*>(pParam->pIOCPModel);
 	int nThreadNo = static_cast<int>(pParam->nThreadNo);
@@ -69,7 +80,7 @@ DWORD WINAPI CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 		else {
 			//读取传入的参数
 			PER_IO_CONTEXT1* pIoContext = CONTAINING_RECORD(pOverlapped, PER_IO_CONTEXT1, m_Overlapped);
-			qDebug() << pIoContext->m_OpType << endl;
+			//qDebug() << pIoContext->m_OpType << endl;
 			//判断是否有客户端断开了
 			if ((0 == dwBytesTransfered) && (RECV_POST == pIoContext->m_OpType || SEND_POST == pIoContext->m_OpType))
 			{
@@ -115,7 +126,7 @@ DWORD WINAPI CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 }
 
 //init winsock 2.2
-bool CIOCPModel1::LoadSocketLib() {
+bool IocpServer::CIOCPModel1::LoadSocketLib() {
 	WSADATA wsaData;
 	int nResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (NO_ERROR != nResult) {
@@ -125,7 +136,7 @@ bool CIOCPModel1::LoadSocketLib() {
 	return true;
 }
 
-bool CIOCPModel1::Start() {
+bool IocpServer::CIOCPModel1::Start() {
 	//初始化线程互斥量
 	InitializeCriticalSection(&m_csContextList);
 	//建立系统退出的事件通知
@@ -152,7 +163,7 @@ bool CIOCPModel1::Start() {
 }
 
 //发送系统退出消息，退出完成端口和线程资源
-void CIOCPModel1::Stop() {
+void IocpServer::CIOCPModel1::Stop() {
 	if (m_pListenContext != nullptr&&m_pListenContext->m_Socket != INVALID_SOCKET) {
 		// 激活关闭消息通知
 		SetEvent(m_hShutdownEvent);
@@ -182,7 +193,7 @@ void CIOCPModel1::Stop() {
 }
 
 // 初始化完成端口
-bool CIOCPModel1::_InitializeIOCP()
+bool IocpServer::CIOCPModel1::_InitializeIOCP()
 {
 	// 建立第一个完成端口
 	m_hIOCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
@@ -212,7 +223,7 @@ bool CIOCPModel1::_InitializeIOCP()
 }
 
 //init socket
-bool CIOCPModel1::_InitializeListenSocket() {
+bool IocpServer::CIOCPModel1::_InitializeListenSocket() {
 	//AcceptEx and GetAcceptExSockaddrs GUID，用于导出函数指针
 	GUID GuidAcceptEx = WSAID_ACCEPTEX;
 	GUID GuidGetAcceptExSockAddrs = WSAID_GETACCEPTEXSOCKADDRS;
@@ -380,7 +391,7 @@ bool CIOCPModel1::_InitializeListenSocket() {
 }
 
 //	最后释放掉所有资源
-void CIOCPModel1::_DeInitialize()
+void IocpServer::CIOCPModel1::_DeInitialize()
 {
 	// 删除客户端列表的互斥量
 	DeleteCriticalSection(&m_csContextList);
@@ -409,7 +420,7 @@ void CIOCPModel1::_DeInitialize()
 /*********************************************************************/
 
 // 投递Accept请求
-bool CIOCPModel1::_PostAccept(PER_IO_CONTEXT1* pAcceptIoContext)
+bool IocpServer::CIOCPModel1::_PostAccept(PER_IO_CONTEXT1* pAcceptIoContext)
 {
 	// 准备参数
 	DWORD dwBytes = 0;
@@ -439,7 +450,7 @@ bool CIOCPModel1::_PostAccept(PER_IO_CONTEXT1* pAcceptIoContext)
 }
 
 // 在有客户端连入的时候，进行处理
-bool CIOCPModel1::_DoAccept(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* pIoContext) {
+bool IocpServer::CIOCPModel1::_DoAccept(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* pIoContext) {
 	SOCKADDR_IN* ClientAddr = nullptr;
 	SOCKADDR_IN* LocalAddr = nullptr;
 	int remoteLen = sizeof(SOCKADDR_IN), localLen = sizeof(SOCKADDR_IN);
@@ -485,7 +496,7 @@ bool CIOCPModel1::_DoAccept(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1
 }
 
 // 投递接收数据请求
-bool CIOCPModel1::_PostRecv(PER_IO_CONTEXT1* pIoContext)
+bool IocpServer::CIOCPModel1::_PostRecv(PER_IO_CONTEXT1* pIoContext)
 {
 	// 初始化变量
 	DWORD dwFlags = 0;
@@ -508,7 +519,7 @@ bool CIOCPModel1::_PostRecv(PER_IO_CONTEXT1* pIoContext)
 	return true;
 }
 
-bool CIOCPModel1::_PostSend(PER_IO_CONTEXT1* pIoContext)
+bool IocpServer::CIOCPModel1::_PostSend(PER_IO_CONTEXT1* pIoContext)
 {
 	// 初始化变量
 	DWORD dwFlags = 0;
@@ -532,7 +543,7 @@ bool CIOCPModel1::_PostSend(PER_IO_CONTEXT1* pIoContext)
 }
 
 // 在有接收的数据到达的时候，进行处理
-bool CIOCPModel1::_DoRecv(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* pIoContext)
+bool IocpServer::CIOCPModel1::_DoRecv(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* pIoContext)
 {
 	// 先把上一次的数据显示出现，然后就重置状态，发出下一个Recv请求
 	SOCKADDR_IN* ClientAddr = &pIoContext->remoteAddr;
@@ -544,7 +555,7 @@ bool CIOCPModel1::_DoRecv(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* 
 
 //UDP
 //投递RecvFrom请求
-bool CIOCPModel1::_PostRecvFrom(PER_IO_CONTEXT1* pIoContext) {
+bool IocpServer::CIOCPModel1::_PostRecvFrom(PER_IO_CONTEXT1* pIoContext) {
 	// 初始化变量
 	DWORD dwFlags = 0;
 	DWORD dwBytes = 0;
@@ -568,17 +579,31 @@ bool CIOCPModel1::_PostRecvFrom(PER_IO_CONTEXT1* pIoContext) {
 	return true;
 }
 
-bool CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext) {
+bool IocpServer::CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext) {
 	// 先把上一次的数据显示出现，然后就重置状态，发出下一个Recv请求
 	SOCKADDR_IN* ClientAddr = &pIoContext->remoteAddr;
-	qDebug() << "收到  " << inet_ntoa(ClientAddr->sin_addr) << ":" << ntohs(ClientAddr->sin_port) << " 信息： " << pIoContext->m_wsaBuf.buf << endl;
-	qDebug() << sizeof(pIoContext->m_wsaBuf.buf) << endl;
+	qDebug() << "收到" << inet_ntoa(ClientAddr->sin_addr) << ":" << ntohs(ClientAddr->sin_port) << " 信息： " << pIoContext->m_wsaBuf.buf << endl;
+	qDebug() << (int)*pIoContext->m_wsaBuf.buf << endl;
+
+	qDebug() << (int)pIoContext->m_wsaBuf.buf[0] << endl;
+	qDebug() << (int)pIoContext->m_wsaBuf.buf[1] << endl;
+	qDebug() << (int)pIoContext->m_wsaBuf.buf[2] << endl;
+	qDebug() << (int)pIoContext->m_wsaBuf.buf[3] << endl;
+	qDebug() << (int)pIoContext->m_wsaBuf.buf[4] << endl;
+	//对收到的数据进行处理
+	//PER_IO_CONTEXT1 temp = *pIoContext;
+	//m_tempContextArray.push_back(temp);
+	char temp[8192];
+	memcpy(temp, pIoContext->m_szBuffer, 8192);
+	//WSABUF temp = (WSABUF)pIoContext->m_wsaBuf;
+	emit parent->serviceHandler(pIoContext, temp);
+
 	// 然后开始投递下一个WSARecv请求
 	return _PostRecvFrom(pIoContext);
 }
 
 //
-bool CIOCPModel1::_PostSendTo(PER_IO_CONTEXT1* pIoContext) {
+bool IocpServer::CIOCPModel1::_PostSendTo(PER_IO_CONTEXT1* pIoContext) {
 	// 初始化变量
 	DWORD dwFlags = 0;
 	DWORD dwBytes = 0;
@@ -601,7 +626,7 @@ bool CIOCPModel1::_PostSendTo(PER_IO_CONTEXT1* pIoContext) {
 }
 
 // 将句柄(Socket)绑定到完成端口中
-bool CIOCPModel1::_AssociateWithIOCP(PER_SOCKET_CONTEXT1 *pContext)
+bool IocpServer::CIOCPModel1::_AssociateWithIOCP(PER_SOCKET_CONTEXT1 *pContext)
 {
 	// 将用于和客户端通信的SOCKET绑定到完成端口中
 	HANDLE hTemp = CreateIoCompletionPort((HANDLE)pContext->m_Socket, m_hIOCompletionPort, (ULONG_PTR)pContext, 0);
@@ -616,7 +641,7 @@ bool CIOCPModel1::_AssociateWithIOCP(PER_SOCKET_CONTEXT1 *pContext)
 }
 
 // 显示并处理完成端口上的错误
-bool CIOCPModel1::HandleError(PER_SOCKET_CONTEXT1 *pContext, const DWORD& dwErr)
+bool IocpServer::CIOCPModel1::HandleError(PER_SOCKET_CONTEXT1 *pContext, const DWORD& dwErr)
 {
 	// 如果是超时了，就再继续等吧
 	if (WAIT_TIMEOUT == dwErr)
@@ -653,7 +678,7 @@ bool CIOCPModel1::HandleError(PER_SOCKET_CONTEXT1 *pContext, const DWORD& dwErr)
 // 判断客户端Socket是否已断开，在一个无效的Socket上投递WSARecv操作会出现异常
 // 使用的方法是尝试向这个socket发送数据，判断这个socket调用的返回值
 // 因为如果客户端网络异常断开(例如客户端崩溃或者拔掉网线等)的时候，服务器端是无法收到客户端断开的通知的
-bool CIOCPModel1::_IsSocketAlive(SOCKET s)
+bool IocpServer::CIOCPModel1::_IsSocketAlive(SOCKET s)
 {
 	int nByteSent = send(s, "", 0, 0);
 	if (-1 == nByteSent) return false;
@@ -661,7 +686,7 @@ bool CIOCPModel1::_IsSocketAlive(SOCKET s)
 }
 
 // 获得本机中处理器的数量
-int CIOCPModel1::_GetNoOfProcessors()
+int IocpServer::CIOCPModel1::_GetNoOfProcessors()
 {
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
@@ -690,22 +715,25 @@ int CIOCPModel1::_GetNoOfProcessors()
 //}
 
 // 清空客户端信息
-void CIOCPModel1::_ClearContextList()
+void IocpServer::CIOCPModel1::_ClearContextList()
 {
 	EnterCriticalSection(&m_csContextList);
 
 	m_arrayClientContext.clear();
-	std::vector<PER_SOCKET_CONTEXT1*>(m_arrayClientContext).swap(m_arrayClientContext);
+	vector<PER_SOCKET_CONTEXT1*>(m_arrayClientContext).swap(m_arrayClientContext);
 
+	m_arrayUdpClientContext.clear();
+	vector<IN_ADDR>(m_arrayUdpClientContext).swap(m_arrayUdpClientContext);
+	
 	LeaveCriticalSection(&m_csContextList);
 }
 
 //	移除某个特定的Context
-void CIOCPModel1::_RemoveContext(PER_SOCKET_CONTEXT1 *pSocketContext)
+void IocpServer::CIOCPModel1::_RemoveContext(PER_SOCKET_CONTEXT1 *pSocketContext)
 {
 	EnterCriticalSection(&m_csContextList);
 
-	for (std::vector<PER_SOCKET_CONTEXT1*>::iterator it = m_arrayClientContext.begin(); it != m_arrayClientContext.end();) {
+	for (vector<PER_SOCKET_CONTEXT1*>::iterator it = m_arrayClientContext.begin(); it != m_arrayClientContext.end();) {
 		if (*it == pSocketContext) {
 			it = m_arrayClientContext.erase(it);
 			delete pSocketContext;
@@ -720,8 +748,24 @@ void CIOCPModel1::_RemoveContext(PER_SOCKET_CONTEXT1 *pSocketContext)
 	LeaveCriticalSection(&m_csContextList);
 }
 
+//移除某个udp用户
+void IocpServer::CIOCPModel1::_RemoveADDR(IN_ADDR inADDR) {
+	EnterCriticalSection(&m_csContextList);
+	for (vector<IN_ADDR>::iterator it = m_arrayUdpClientContext.begin(); it != m_arrayUdpClientContext.end();) {
+		IN_ADDR temp = (IN_ADDR)(*it);
+		if (temp.S_un.S_addr == inADDR.S_un.S_addr) {
+			it = m_arrayUdpClientContext.erase(it);
+			break;
+		}
+		else {
+			++it;
+		}
+	}
+	LeaveCriticalSection(&m_csContextList);
+}
+
 // 将客户端的相关信息存储到数组中
-void CIOCPModel1::_AddToContextList(PER_SOCKET_CONTEXT1 *pHandleData)
+void IocpServer::CIOCPModel1::_AddToContextList(PER_SOCKET_CONTEXT1 *pHandleData)
 {
 	EnterCriticalSection(&m_csContextList);
 
@@ -730,50 +774,51 @@ void CIOCPModel1::_AddToContextList(PER_SOCKET_CONTEXT1 *pHandleData)
 	LeaveCriticalSection(&m_csContextList);
 }
 
-void CIOCPModel1::SendData() {
-	//取一个socket
-	PER_SOCKET_CONTEXT1* temp = nullptr;
-	if (!m_arrayClientContext.empty()) {
-		temp = m_arrayClientContext[0];
-	}
-	else {
-		qDebug() << "no socket" << endl;
-		return;
-	}
-
-	//创建一个iocontext
-	PER_IO_CONTEXT1* pNewIoContext = temp->GetNewIoContext();
-	pNewIoContext->m_OpType = SEND_POST;
-	pNewIoContext->m_sockAccept = temp->m_Socket;
-	strcpy(pNewIoContext->m_szBuffer, "test");
-	qDebug() << pNewIoContext->m_szBuffer << endl;
-	qDebug() << "!!!" << endl;
-	// 绑定完毕之后，就可以开始在这个Socket上投递完成请求了
-	if (false == this->_PostSend(pNewIoContext))
-	{
-		temp->RemoveContext(pNewIoContext);
-		return;
-	}
-}
+//void IocpServer::CIOCPModel1::SendData() {
+//	//取一个socket
+//	PER_SOCKET_CONTEXT1* temp = nullptr;
+//	if (!m_arrayClientContext.empty()) {
+//		temp = m_arrayClientContext[0];
+//	}
+//	else {
+//		qDebug() << "no socket" << endl;
+//		return;
+//	}
+//
+//	//创建一个iocontext
+//	PER_IO_CONTEXT1* pNewIoContext = temp->GetNewIoContext();
+//	pNewIoContext->m_OpType = SEND_POST;
+//	pNewIoContext->m_sockAccept = temp->m_Socket;
+//	strcpy(pNewIoContext->m_szBuffer, "test");
+//	qDebug() << pNewIoContext->m_szBuffer << endl;
+//	qDebug() << "!!!" << endl;
+//	// 绑定完毕之后，就可以开始在这个Socket上投递完成请求了
+//	if (false == this->_PostSend(pNewIoContext))
+//	{
+//		temp->RemoveContext(pNewIoContext);
+//		return;
+//	}
+//}
 
 IocpServer::IocpServer()
 {
+	m_IOCP = new CIOCPModel1(this);
 }
 
 IocpServer::~IocpServer()
 {
-	m_IOCP.Stop();
+	m_IOCP->Stop();
 }
 
 bool IocpServer::serverStart() {
-	if (false == m_IOCP.LoadSocketLib()) {
+	if (false == m_IOCP->LoadSocketLib()) {
 		qDebug() << "*** 加载Winsock 2.2失败，服务器端无法运行！ ***" << endl;
 		return false;
 	}
 	else {
 		qDebug() << "加载Winsock 2.2" << endl;
 	}
-	if (false == m_IOCP.Start()) {
+	if (false == m_IOCP->Start()) {
 		qDebug() << "*** server start fail ***" << endl;
 		return false;
 	}
@@ -784,5 +829,5 @@ bool IocpServer::serverStart() {
 }
 
 void IocpServer::serverStop() {
-	m_IOCP.Stop();
+	m_IOCP->Stop();
 }

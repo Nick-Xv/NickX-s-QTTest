@@ -390,8 +390,8 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="UdpChatService.h" />
-    <ClInclude Include="IocpServer.h" />
+    <QtMoc Include="UdpChatService.h" />
+    <QtMoc Include="IocpServer.h" />
     <ClInclude Include="MySqlHandler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

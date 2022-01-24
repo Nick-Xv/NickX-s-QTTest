@@ -27,6 +27,7 @@ bool MySqlHandler::connectDb() {
 	return true;
 }
 
+//数据库写入
 bool MySqlHandler::queryDb(QString query) {
 	sprintf_s(this->query, query.toUtf8());
 	//mysql_query(mysql, )
@@ -51,6 +52,35 @@ bool MySqlHandler::queryDb(QString query) {
 	qDebug() << str_field[0] << str_field[1] << endl;
 	while (column = mysql_fetch_row(res)) {
 		qDebug() << column[0] << column[1] << endl;
+	}
+	return true;
+}
+
+//查询一个字符串
+bool MySqlHandler::queryDb(QString query, QString& result) {
+	sprintf_s(this->query, query.toUtf8());
+	//mysql_query(mysql, )
+	if (mysql_query(mysql, this->query)) {
+		qDebug() << "query failed " << mysql_error(mysql) << endl;
+		return false;
+	}
+	else {
+		qDebug() << "query success" << endl;
+	}
+	//获取结果集
+	if (!(res = mysql_store_result(mysql))) {
+		qDebug() << "can't get result" << endl;
+		return false;
+	}
+
+	qDebug() << "number of dataline returned: " << mysql_affected_rows(mysql) << endl;
+
+	if (mysql_affected_rows(mysql)) {
+		column = mysql_fetch_row(res);
+		result = column[0];
+	}
+	else {
+		return false;
 	}
 	return true;
 }
