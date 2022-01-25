@@ -28,7 +28,7 @@ bool MySqlHandler::connectDb() {
 }
 
 //数据库写入
-bool MySqlHandler::queryDb(QString query) {
+bool MySqlHandler::queryDb(QString query, int resultNum) {
 	sprintf_s(this->query, query.toUtf8());
 	//mysql_query(mysql, )
 	if (mysql_query(mysql, this->query)) {
@@ -46,12 +46,14 @@ bool MySqlHandler::queryDb(QString query) {
 
 	qDebug() << "number of dataline returned: " << mysql_affected_rows(mysql) << endl;
 	char* str_field[32];
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < resultNum; i++) {
 		str_field[i] = mysql_fetch_field(res)->name;
+		qDebug() << str_field[i] << endl;
 	}
-	qDebug() << str_field[0] << str_field[1] << endl;
 	while (column = mysql_fetch_row(res)) {
-		qDebug() << column[0] << column[1] << endl;
+		for (int i = 0; i < resultNum; i++) {
+			qDebug() << column[i] << endl;
+		}
 	}
 	return true;
 }

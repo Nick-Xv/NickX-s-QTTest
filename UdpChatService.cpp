@@ -45,6 +45,14 @@ void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff) 
 	qDebug() << (int)buff[2] << endl;
 	qDebug() << (int)buff[3] << endl;
 	qDebug() << (int)buff[4] << endl;
+	qDebug() << (int)buff[5] << endl;
+	qDebug() << (int)buff[6] << endl;
+	qDebug() << (int)buff[7] << endl;
+	qDebug() << (int)buff[8] << endl;
+	qDebug() << (int)buff[9] << endl;
+	qDebug() << (int)buff[10] << endl;
+	qDebug() << (int)buff[11] << endl;
+	qDebug() << (int)buff[12] << endl;
 	qDebug() << inet_ntoa(pIoContext->remoteAddr.sin_addr) << "!!!" << endl;
 	switch (type) {
 	case GET_PASSWORD:
@@ -57,7 +65,7 @@ void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff) 
 		//s_PostRecord(buf);
 		break;
 	case POST_REGIST:
-		//s_PostRegist(buf);
+		s_PostRegist(pIoContext, buff);
 		break;
 	case CHECK_PASSWORD:
 		//s_CheckPassword(buf);
@@ -65,8 +73,12 @@ void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff) 
 	}
 }
 
+void UdpChatService::s_PostACK(PER_IO_CONTEXT1* pIoContext, int result) {
+	//iocpServer->
+}
+
 //buf[5]到buf[8] userId
-bool UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
+void UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
 	//char* buf = pIoContext->m_szBuffer;
 	char* buf = buff;
 	int userId;
@@ -88,6 +100,46 @@ bool UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
 
 	//发送数据
 	//iocpServer->
+}
 
-	return true;
+//buf[5]到第一个0，username
+//后面到0，password
+//ACK值：0-数据错误
+//		 1-用户名已存在
+//		 2-数据库错误
+//		 3-插入成功
+void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf) {
+	//获取username和password
+	bool judge = false;
+	int i = 5;
+	int usernamePtr;
+	int passwordPtr;
+	while (buf[i]!=0 || judge==false) {
+		if (buf[i] == 0) {
+			usernamePtr = i;
+			judge = true;
+		}
+		i++;
+	}
+	passwordPtr = i;
+	//数据不完整直接返回false
+	if (usernamePtr == 5 || usernamePtr == passwordPtr - 1) {
+		s_PostACK(pIoContext, 0);
+		return;
+	}
+	qDebug() << usernamePtr << passwordPtr << endl;
+	char* username = new char[usernamePtr - 4];
+	char* password = new char[passwordPtr - usernamePtr];
+	memset(username,0,usernamePtr-4);
+	memset(password, 0, passwordPtr - usernamePtr);
+	memcpy(username, &buf[5], usernamePtr - 5);
+	memcpy(password, &buf[usernamePtr+1], passwordPtr - usernamePtr - 1);
+
+	//查询数据库的username
+	QString query;
+	query = "select userName from users where userName='";
+	query.append(username);
+	query.append("';");
+	qDebug() << query << endl;
+	mysqlHandler->queryDb(query,1);
 }

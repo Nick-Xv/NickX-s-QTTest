@@ -33,10 +33,13 @@ private:
 	MySqlHandler* mysqlHandler;
 	IocpServer* iocpServer;
 
-	bool s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//bool s_GetRecord(WSABUF* buf);
-	//bool s_PostRecord(WSABUF* buf);
-	//bool s_PostRegist(WSABUF* buf);
-	//bool s_CheckPassword(WSABUF* buf);
+	void s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//void s_GetRecord(WSABUF* buf);
+	//void s_PostRecord(WSABUF* buf);
+	void s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//void s_CheckPassword(WSABUF* buf);
+
+	//发送答复报文
+	void s_PostACK(PER_IO_CONTEXT1* pIoContext, int result);
 };
 
