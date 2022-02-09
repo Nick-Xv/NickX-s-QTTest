@@ -33,11 +33,16 @@ private:
 	MySqlHandler* mysqlHandler;
 	IocpServer* iocpServer;
 
-	void s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//void s_GetRecord(WSABUF* buf);
-	//void s_PostRecord(WSABUF* buf);
+	//找回密码
+	//void s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//获取聊天记录
+	void s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//发送消息
+	void s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//用户注册
 	void s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//void s_CheckPassword(WSABUF* buf);
+	//检查密码
+	void s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
 
 	//发送答复报文
 	void s_PostACK(PER_IO_CONTEXT1* pIoContext, int result);

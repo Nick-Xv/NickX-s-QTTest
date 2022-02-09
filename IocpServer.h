@@ -125,6 +125,8 @@ public:
 	~IocpServer();
 	bool serverStart();
 	void serverStop();
+	void SendDataTo(PER_IO_CONTEXT1* pIoContext);//发送数据
+
 	class CIOCPModel1 {
 	public:
 		CIOCPModel1(IocpServer* parent);
@@ -136,10 +138,9 @@ public:
 		void UnloadSocketLib() { WSACleanup(); }//卸载Socket库
 												//string GetLocalIP();//获取本机ip
 		void SetPort(const int& nPort) { m_nPort = nPort; }
-
-		//void SendData();//发送数据
-
 		static int _GetNoOfProcessors();//本机处理器数量
+
+		void SendDataTo(PER_IO_CONTEXT1* pIoContext);//发送数据
 
 	protected:
 		bool _InitializeIOCP();//init iocp

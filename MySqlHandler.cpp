@@ -27,12 +27,15 @@ bool MySqlHandler::connectDb() {
 	return true;
 }
 
-//数据库写入
-bool MySqlHandler::queryDb(QString query, int resultNum) {
+//查询是否存在用户名
+//resultNum：结果列数
+//ack：查询结果
+bool MySqlHandler::queryDb(QString query, int resultNum, int& ack) {
 	sprintf_s(this->query, query.toUtf8());
 	//mysql_query(mysql, )
 	if (mysql_query(mysql, this->query)) {
 		qDebug() << "query failed " << mysql_error(mysql) << endl;
+		ack = 2;
 		return false;
 	}
 	else {
@@ -41,10 +44,16 @@ bool MySqlHandler::queryDb(QString query, int resultNum) {
 	//获取结果集
 	if (!(res = mysql_store_result(mysql))) {
 		qDebug() << "can't get result" << endl;
+		ack = 2;
 		return false;
 	}
 
 	qDebug() << "number of dataline returned: " << mysql_affected_rows(mysql) << endl;
+	if (mysql_affected_rows(mysql)!=0) {
+		ack = 1;
+		return false;
+	}
+	/*
 	char* str_field[32];
 	for (int i = 0; i < resultNum; i++) {
 		str_field[i] = mysql_fetch_field(res)->name;
@@ -54,6 +63,26 @@ bool MySqlHandler::queryDb(QString query, int resultNum) {
 		for (int i = 0; i < resultNum; i++) {
 			qDebug() << column[i] << endl;
 		}
+	}
+	*/
+	return true;
+}
+
+
+//插入数据库(用户名和密码)
+//ack：	2失败
+//		3成功
+bool MySqlHandler::queryDb(QString query, int& ack) {
+	sprintf_s(this->query, query.toUtf8());
+	//mysql_query(mysql, )
+	if (mysql_query(mysql, this->query)) {
+		qDebug() << "query failed " << mysql_error(mysql) << endl;
+		ack = 2;
+		return false;
+	}
+	else {
+		ack = 3;
+		qDebug() << "query success" << endl;
 	}
 	return true;
 }

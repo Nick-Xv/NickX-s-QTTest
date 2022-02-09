@@ -2,11 +2,10 @@
 
 //每个处理器上产生多少个线程()
 const int WORKER_THREADS_PER_PROCESSOR1 = 2;
-//
+//计算线程数量
 const int THREAD_NUMBER = WORKER_THREADS_PER_PROCESSOR1 * IocpServer::CIOCPModel1::_GetNoOfProcessors() + 2;
 //同时投递的accept请求的数量(灵活设置)
-const int MAX_POST_ACCEPT1 = THREAD_NUMBER / 2;
-
+const int MAX_POST_ACCEPT1 = (THREAD_NUMBER-2) / 2;
 //传递给Worker线程的退出信号
 #define EXIT_CODE NULL
 
@@ -647,16 +646,16 @@ bool IocpServer::CIOCPModel1::_PostSendTo(PER_IO_CONTEXT1* pIoContext) {
 	WSABUF *p_wbuf = &pIoContext->m_wsaBuf;
 	OVERLAPPED *p_ol = &pIoContext->m_Overlapped;
 
-	//pIoContext->ResetBuffer();
+	// pIoContext->ResetBuffer();
 	pIoContext->m_OpType = SENDTO_POST;
 
-	// 初始化完成后，投递WSASend请求
+	// 初始化完成后，投递WSASendTo请求
 	int nBytesRecv = WSASendTo(pIoContext->m_sockAccept, p_wbuf, 1, &dwBytes, dwFlags, (SOCKADDR*)&pIoContext->remoteAddr,pIoContext->remoteAddrLen, p_ol, nullptr);
 
 	// 如果返回值错误，并且错误的代码并非是Pending的话，那就说明这个重叠请求失败了
 	if ((SOCKET_ERROR == nBytesRecv) && (WSA_IO_PENDING != WSAGetLastError()))
 	{
-		qDebug() << "投递WSASend失败！ " << endl;
+		qDebug() << "投递WSASendTo失败！ " << endl;
 		return false;
 	}
 	return true;
@@ -836,6 +835,16 @@ void IocpServer::CIOCPModel1::_AddToContextList(PER_SOCKET_CONTEXT1 *pHandleData
 //		return;
 //	}
 //}
+
+void IocpServer::SendDataTo(PER_IO_CONTEXT1* pIoContext) {
+	pIoContext->m_OpType = SENDTO_POST;
+	qDebug() << pIoContext->m_szBuffer << endl;
+	m_IOCP->SendDataTo(pIoContext);
+}
+
+void IocpServer::CIOCPModel1::SendDataTo(PER_IO_CONTEXT1* pIoContext) {
+	_PostSendTo(pIoContext);
+}
 
 IocpServer::IocpServer()
 {

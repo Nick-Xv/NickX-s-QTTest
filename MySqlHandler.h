@@ -11,7 +11,8 @@ public:
 	MySqlHandler();
 	~MySqlHandler();
 	bool connectDb();
-	bool queryDb(QString query,int resultNum);
+	bool queryDb(QString query,int resultNum,int& ack);
+	bool queryDb(QString query, int& ack);
 	bool queryDb(QString query, QString& result);
 	void closeDb();
 private:

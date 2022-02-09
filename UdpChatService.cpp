@@ -1,7 +1,6 @@
 #include "UdpChatService.h"
 
-
-
+//构造
 UdpChatService::UdpChatService()
 {
 	if (initService()) {
@@ -12,7 +11,7 @@ UdpChatService::UdpChatService()
 	}
 }
 
-
+//析构
 UdpChatService::~UdpChatService()
 {
 	closeService();
@@ -26,7 +25,8 @@ bool UdpChatService::initService() {
 	mysqlHandler = new MySqlHandler();
 
 	//绑定服务信号槽
-	QObject::connect(iocpServer, &IocpServer::serviceHandler, this, &UdpChatService::serviceDispatcher);
+	QObject::connect(iocpServer, &IocpServer::serviceHandler,
+		this, &UdpChatService::serviceDispatcher);
 
 	return (iocpServer->serverStart() && mysqlHandler->connectDb());
 }
@@ -37,9 +37,10 @@ void UdpChatService::closeService() {
 	mysqlHandler->closeDb();
 }
 
-//服务处理器
+//服务分配处理
 void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff) {
 	SERVICE_TYPE type = (SERVICE_TYPE)(int)buff[0];
+	/*
 	qDebug() << (int)buff[0] << endl;
 	qDebug() << (int)buff[1] << endl;
 	qDebug() << (int)buff[2] << endl;
@@ -53,30 +54,33 @@ void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff) 
 	qDebug() << (int)buff[10] << endl;
 	qDebug() << (int)buff[11] << endl;
 	qDebug() << (int)buff[12] << endl;
+	*/
 	qDebug() << inet_ntoa(pIoContext->remoteAddr.sin_addr) << "!!!" << endl;
 	switch (type) {
-	case GET_PASSWORD:
+	/*case GET_PASSWORD:
 		s_GetPassword(pIoContext, buff);
-		break;
+		break;*/
 	case GET_RECORD:
-		//s_GetRecord(buf);
+		s_GetRecord(pIoContext, buff);
 		break;
 	case POST_RECORD:
-		//s_PostRecord(buf);
+		s_PostRecord(pIoContext, buff);
 		break;
 	case POST_REGIST:
 		s_PostRegist(pIoContext, buff);
 		break;
 	case CHECK_PASSWORD:
-		//s_CheckPassword(buf);
+		s_CheckPassword(pIoContext, buff);
 		break;
 	}
 }
 
+//发送返回ack值
 void UdpChatService::s_PostACK(PER_IO_CONTEXT1* pIoContext, int result) {
-	//iocpServer->
+	pIoContext->m_szBuffer[0] = result;
+	iocpServer->SendDataTo(pIoContext);
 }
-
+/*
 //buf[5]到buf[8] userId
 void UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
 	//char* buf = pIoContext->m_szBuffer;
@@ -101,7 +105,9 @@ void UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
 	//发送数据
 	//iocpServer->
 }
+*/
 
+//用户注册 包括查询用户名和插入用户名密码
 //buf[5]到第一个0，username
 //后面到0，password
 //ACK值：0-数据错误
@@ -114,6 +120,7 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf) {
 	int i = 5;
 	int usernamePtr;
 	int passwordPtr;
+	int ack = -1;
 	while (buf[i]!=0 || judge==false) {
 		if (buf[i] == 0) {
 			usernamePtr = i;
@@ -141,5 +148,61 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf) {
 	query.append(username);
 	query.append("';");
 	qDebug() << query << endl;
-	mysqlHandler->queryDb(query,1);
+	mysqlHandler -> queryDb(query, 1, ack);
+	//出现异常直接返回
+	if (ack != -1) {
+		s_PostACK(pIoContext, ack);
+	}
+	else {
+		//插入用户名和密码
+		query = "insert into users (userName,userPassword) values('";
+		query.append(username);
+		query.append("','");
+		query.append(password);
+		query.append("');");
+		qDebug() << query << endl;
+		mysqlHandler->queryDb(query, ack);
+		if (ack == -1) ack = 2;
+		s_PostACK(pIoContext, ack);
+	}
+}
+
+//获取聊天记录 
+//一次查10条
+//通过提供的roomid和当前查询过的最后一条idrecords
+//buf[5]到第一个0，roomid
+//再到0，idrecords
+//ACK值：0-数据错误
+//		 1-查询成功
+//		 2-数据库错误
+//缓冲区结尾标记两字节0
+void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf) {
+
+}
+
+
+//发送消息，并且发给当前聊天室中的所有用户处
+//提供roomid, userid, content
+//buf[5]到第一个0，roomid
+//再到0，userid
+//再到0，content
+//ACK值：0-数据错误
+//		 1-插入成功
+//		 2-数据库错误
+//缓冲区结尾标记两字节0
+void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf) {
+
+}
+
+//检查密码正确
+//提供userName, userPassword
+//buf[5]到第一个0，userName
+//再到0，userPassword
+//ACK值：0-数据错误
+//		 1-密码正确
+//		 2-数据库错误
+//		 3-密码错误
+//缓冲区结尾标记两字节0
+void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf) {
+
 }
