@@ -1,4 +1,8 @@
 #include "UdpChatService.h"
+//释放指针宏
+#define RELEASE(x) {if((x)!=nullptr){delete(x);(x)=nullptr;}}
+//释放句柄宏
+#define RELEASE_HANDLE(x) {if((x)!=nullptr&&(x)!=INVALID_HANDLE_VALUE){CloseHandle(x);(x)=nullptr;}}
 
 //构造
 UdpChatService::UdpChatService()
@@ -27,6 +31,10 @@ bool UdpChatService::initService() {
 	for (int i = 0; i < 1000; i++) {
 		m_arrayClientContext[i] = nullptr;
 	}
+	//打开心跳检测线程
+	HeartbeatThreadHandle = new HANDLE;
+	*HeartbeatThreadHandle = ::CreateThread(0, 0, _CheckHeartbeatThread, this, 0, nullptr);
+	
 
 	//绑定服务信号槽
 	QObject::connect(iocpServer, &IocpServer::serviceHandler,
@@ -39,6 +47,8 @@ bool UdpChatService::initService() {
 void UdpChatService::closeService() {
 	iocpServer->serverStop();
 	mysqlHandler->closeDb();
+	RELEASE_HANDLE(*HeartbeatThreadHandle);
+	RELEASE(HeartbeatThreadHandle);
 }
 
 //服务分配处理
@@ -218,7 +228,6 @@ void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf) {
 }
 
 //心跳监测
-//10s一次，20s超时
 //提供userid,roomid
 //buf[5]到第一个0，userid
 //再到0，roomid
@@ -279,4 +288,30 @@ void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf) {
 		}
 	}
 	s_PostACK(pIoContext, 1);
+}
+
+//心跳线程函数
+//每30秒给所有注册用户+1
+//加到2（60秒）就注销用户
+DWORD WINAPI UdpChatService::_CheckHeartbeatThread(LPVOID lpParam) {
+	UdpChatService* pParam = static_cast<UdpChatService*>(lpParam);
+	//每30秒检测一次
+	while (1) {
+		Sleep(30000);
+		for (int i = 0; i < 1000; i++) {
+			if (pParam->m_arrayClientContext[i] != nullptr) {
+				if (pParam->m_arrayClientContext[i]->size() > 0) {
+					map<int, pair<PER_IO_CONTEXT1*, int>>::iterator iter;
+					for (iter = pParam->m_arrayClientContext[i]->begin(); iter != pParam->m_arrayClientContext[i]->end(); iter++) {
+						iter->second.second++;
+						//超时删除
+						if (iter->second.second >= 2) {
+							pParam->m_arrayClientContext[i]->erase(iter);
+						}
+					}
+				}
+			}
+		}
+	}
+	return 0;
 }

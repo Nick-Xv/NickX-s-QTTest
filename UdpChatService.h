@@ -4,7 +4,7 @@
 #include <winsock2.h>
 #include <QMessageBox>
 #include <map>
-#include <pair>
+#include <utility>
 using std::pair;
 using std::map;
 enum SERVICE_TYPE {
@@ -29,6 +29,9 @@ public:
 	bool initService();
 	void closeService();
 
+protected:
+	static DWORD WINAPI _CheckHeartbeatThread(LPVOID lpParam);//心跳线程函数
+
 	//bool get
 public slots:
 void serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buf);
@@ -36,6 +39,8 @@ void serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buf);
 private:
 	MySqlHandler* mysqlHandler;
 	IocpServer* iocpServer;
+
+	HANDLE* HeartbeatThreadHandle;
 
 	map<int, pair<PER_IO_CONTEXT1*,int>>* m_arrayClientContext[1000];//客户端vector指针数组
 
