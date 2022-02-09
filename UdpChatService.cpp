@@ -24,6 +24,10 @@ bool UdpChatService::initService() {
 	iocpServer = new IocpServer();
 	mysqlHandler = new MySqlHandler();
 
+	for (int i = 0; i < 1000; i++) {
+		m_arrayClientContext[i] = nullptr;
+	}
+
 	//绑定服务信号槽
 	QObject::connect(iocpServer, &IocpServer::serviceHandler,
 		this, &UdpChatService::serviceDispatcher);
@@ -72,6 +76,9 @@ void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff) 
 	case CHECK_PASSWORD:
 		s_CheckPassword(pIoContext, buff);
 		break;
+	case CHECK_HEARTBEAT:
+		s_CheckHeartbeat(pIoContext, buff);
+		break;
 	}
 }
 
@@ -116,31 +123,32 @@ void UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
 //		 3-插入成功
 void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf) {
 	//获取username和password
-	bool judge = false;
 	int i = 5;
-	int usernamePtr;
-	int passwordPtr;
-	int ack = -1;
-	while (buf[i]!=0 || judge==false) {
+	int beginPtr[2] = { 0 };
+	int endPtr[2] = { 0 };
+	int num = 0;
+	beginPtr[num] = i;
+	while (buf[i] != 0 || buf[i + 1] != 0) {
 		if (buf[i] == 0) {
-			usernamePtr = i;
-			judge = true;
+			endPtr[num] = i;
+			beginPtr[++num] = i + 1;
 		}
 		i++;
 	}
-	passwordPtr = i;
+	endPtr[num] = i;
+
 	//数据不完整直接返回false
-	if (usernamePtr == 5 || usernamePtr == passwordPtr - 1) {
+	if (beginPtr[1] == 0) {
 		s_PostACK(pIoContext, 0);
 		return;
 	}
-	qDebug() << usernamePtr << passwordPtr << endl;
-	char* username = new char[usernamePtr - 4];
-	char* password = new char[passwordPtr - usernamePtr];
-	memset(username,0,usernamePtr-4);
-	memset(password, 0, passwordPtr - usernamePtr);
-	memcpy(username, &buf[5], usernamePtr - 5);
-	memcpy(password, &buf[usernamePtr+1], passwordPtr - usernamePtr - 1);
+
+	char* username = new char[endPtr[0] - beginPtr[0] + 1];
+	char* password = new char[endPtr[1] - beginPtr[1] + 1];
+	memset(username, 0, endPtr[0] - beginPtr[0] + 1);
+	memset(password, 0, endPtr[1] - beginPtr[1] + 1);
+	memcpy(username, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
+	memcpy(password, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
 
 	//查询数据库的username
 	QString query;
@@ -148,6 +156,8 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf) {
 	query.append(username);
 	query.append("';");
 	qDebug() << query << endl;
+
+	int ack = -1;
 	mysqlHandler -> queryDb(query, 1, ack);
 	//出现异常直接返回
 	if (ack != -1) {
@@ -205,4 +215,68 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf) {
 //缓冲区结尾标记两字节0
 void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf) {
 
+}
+
+//心跳监测
+//10s一次，20s超时
+//提供userid,roomid
+//buf[5]到第一个0，userid
+//再到0，roomid
+//ACK值：0-数据错误
+//		 1-正确接收
+//缓冲区结尾标记两字节0
+void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf) {
+	//获取userid和roomid
+	int i = 5;
+	int beginPtr[2] = { 0 };
+	int endPtr[2] = { 0 };
+	int num = 0;
+	beginPtr[num] = i;
+	while (buf[i] != 0 || buf[i+1] != 0) {
+		if (buf[i] == 0) {
+			endPtr[num] = i;
+			beginPtr[++num] = i + 1;
+		}
+		i++;
+	}
+	endPtr[num] = i;
+
+	//数据不完整直接返回false
+	if (beginPtr[1] == 0) {
+		s_PostACK(pIoContext, 0);
+		return;
+	}
+	char* userid = new char[endPtr[0] - beginPtr[0] + 1];
+	char* roomid = new char[endPtr[1] - beginPtr[1] + 1];
+	memset(userid, 0, endPtr[0] - beginPtr[0] + 1);
+	memset(roomid, 0, endPtr[1] - beginPtr[1] + 1);
+	memcpy(userid, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
+	memcpy(roomid, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
+
+	int roomID = atoi(roomid);
+	int userID = atoi(userid);
+	if (roomID == 0) {
+		s_PostACK(pIoContext, 0);
+		return;
+	}
+	//空指针时新建map
+	if (m_arrayClientContext[roomID] == nullptr) {
+		m_arrayClientContext[roomID] = new map<int, pair<PER_IO_CONTEXT1*,int>>;
+	}
+	//空map就插入数据
+	if (m_arrayClientContext[roomID]->size() == 0) {
+		m_arrayClientContext[roomID]->insert(map<int, pair<PER_IO_CONTEXT1*, int>>::value_type(userID, pair<PER_IO_CONTEXT1*, int>(pIoContext,0)));
+	}
+	else {
+		map<int, pair<PER_IO_CONTEXT1*, int>>::iterator iter;
+		iter = m_arrayClientContext[roomID]->find(userID);
+		if (iter == m_arrayClientContext[roomID]->end()) {//没查到,插入
+			m_arrayClientContext[roomID]->insert(map<int, pair<PER_IO_CONTEXT1*, int>>::value_type(userID, pair<PER_IO_CONTEXT1*, int>(pIoContext, 0)));
+		}
+		else {
+			//查到了，将延时清零
+			iter->second.second = 0;
+		}
+	}
+	s_PostACK(pIoContext, 1);
 }

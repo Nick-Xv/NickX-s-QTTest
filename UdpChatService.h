@@ -3,6 +3,10 @@
 #include "iocpserver.h"
 #include <winsock2.h>
 #include <QMessageBox>
+#include <map>
+#include <pair>
+using std::pair;
+using std::map;
 enum SERVICE_TYPE {
 	NO_SERVICE,
 	//GET
@@ -33,6 +37,8 @@ private:
 	MySqlHandler* mysqlHandler;
 	IocpServer* iocpServer;
 
+	map<int, pair<PER_IO_CONTEXT1*,int>>* m_arrayClientContext[1000];//客户端vector指针数组
+
 	//找回密码
 	//void s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
 	//获取聊天记录
@@ -43,6 +49,8 @@ private:
 	void s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf);
 	//检查密码
 	void s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//心跳监测
+	void s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf);
 
 	//发送答复报文
 	void s_PostACK(PER_IO_CONTEXT1* pIoContext, int result);
