@@ -90,6 +90,9 @@ DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 	PER_SOCKET_CONTEXT1* pSocketContext = nullptr;
 	DWORD dwBytesTransfered = 0;
 
+	//每个线程一个数据库连接
+	MySqlHandler* mysqlHandler = pParam->mysqlHandler;
+
 	//循环处理请求，直到接收到shutdown信息为止
 	while (WAIT_OBJECT_0 != WaitForSingleObject(pIOCPModel->m_hShutdownEvent, 0)) {
 		BOOL bReturn = GetQueuedCompletionStatus(
@@ -140,7 +143,7 @@ DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 				}
 				break;
 				case RECVFROM_POST: {
-					pIOCPModel->_DoRecvFrom(pIoContext, nThreadNo-1, curBufNo);
+					pIOCPModel->_DoRecvFrom(pIoContext, nThreadNo-1, curBufNo, mysqlHandler);
 				}
 				break;
 				case SENDTO_POST: {
@@ -156,6 +159,8 @@ DWORD WINAPI IocpServer::CIOCPModel1::_WorkerThread(LPVOID lpParam) {
 			}
 		}
 	}
+	//退出前关闭数据库连接
+	mysqlHandler->closeDb();
 	qDebug() << "工作者线程 " << nThreadNo << "号退出 " << endl;
 	RELEASE(lpParam);
 	return 0;
@@ -243,6 +248,18 @@ bool IocpServer::CIOCPModel1::_InitializeIOCP()
 	// 为工作者线程初始化句柄
 	m_phWorkerThreads = new HANDLE[m_nThreads];
 
+	//先建立每个线程的数据库连接
+	mysqlHandler = new MySqlHandler*[m_nThreads];
+	for (int i = 0; i < m_nThreads; i++) {
+		mysqlHandler[i] = new MySqlHandler();
+		if (mysqlHandler[i]->connectDb()) {
+			qDebug() << "数据库连接成功" << endl;
+		}
+		else {
+			qDebug() << "数据库连接失败" << endl;
+		}
+	}
+
 	// 根据计算出来的数量建立工作者线程
 	DWORD nThreadID;
 	for (int i = 0; i < m_nThreads; i++)
@@ -250,6 +267,7 @@ bool IocpServer::CIOCPModel1::_InitializeIOCP()
 		THREADPARAMS_WORKER1* pThreadParams = new THREADPARAMS_WORKER1;
 		pThreadParams->pIOCPModel = this;
 		pThreadParams->nThreadNo = i + 1;
+		pThreadParams->mysqlHandler = mysqlHandler[i];
 		m_phWorkerThreads[i] = ::CreateThread(0, 0, _WorkerThread, (void *)pThreadParams, 0, &nThreadID);
 	}
 
@@ -346,10 +364,9 @@ bool IocpServer::CIOCPModel1::_InitializeListenSocket() {
 	{
 		qDebug() << "Udp Listen Socket绑定完成端口 完成." << endl;
 	}
-
-	qDebug() << "马上开始recv" << endl;
-
 	//开始重叠recvfrom
+	qDebug() << "马上开始recv" << endl;
+	qDebug() << m_nThreads - MAX_POST_ACCEPT1 << endl;
 	for (int i = 0; i < m_nThreads - MAX_POST_ACCEPT1; i++) {
 		PER_IO_CONTEXT1* pRecvFromIoContext = m_pListenContextUdp->GetNewIoContext();
 		pRecvFromIoContext->m_sockAccept = m_pListenContextUdp->m_Socket;
@@ -615,7 +632,7 @@ bool IocpServer::CIOCPModel1::_PostRecvFrom(PER_IO_CONTEXT1* pIoContext) {
 	return true;
 }
 
-bool IocpServer::CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threadNo, int curBufNo) {
+bool IocpServer::CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threadNo, int curBufNo, MySqlHandler* mysqlHandler ) {
 	// 先把上一次的数据显示出现，然后就重置状态，发出下一个Recv请求
 	SOCKADDR_IN* ClientAddr = &pIoContext->remoteAddr;
 	qDebug() << "收到" << inet_ntoa(ClientAddr->sin_addr) << ":" << ntohs(ClientAddr->sin_port) << " 信息： " << this->bufferPtr[threadNo][curBufNo] << endl;
@@ -632,10 +649,19 @@ bool IocpServer::CIOCPModel1::_DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threa
 	//char temp[8192];
 	//memcpy(temp, pIoContext->m_szBuffer, 8192);
 	//WSABUF temp = (WSABUF)pIoContext->m_wsaBuf;
-	emit parent->serviceHandler(pIoContext, this->bufferPtr[threadNo][curBufNo]);
+	qDebug() << "emit" << endl;
+	emit parent->serviceHandler(pIoContext, this->bufferPtr[threadNo][curBufNo], mysqlHandler);
 
 	// 然后开始投递下一个WSARecv请求
-	return _PostRecvFrom(pIoContext);
+	//return _PostRecvFrom(pIoContext);
+
+	PER_IO_CONTEXT1* pRecvFromIoContext = m_pListenContextUdp->GetNewIoContext();
+	pRecvFromIoContext->m_sockAccept = m_pListenContextUdp->m_Socket;
+	if (false == this->_PostRecvFrom(pRecvFromIoContext))
+	{
+		m_pListenContextUdp->RemoveContext(pRecvFromIoContext);
+		return false;
+	}
 }
 
 //

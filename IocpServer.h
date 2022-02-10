@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QMetaType>
 #include <malloc.h>
+#include "mysqlhandler.h"
 using std::string;
 using std::vector;
 
@@ -151,7 +152,7 @@ public:
 		bool _PostSend(PER_IO_CONTEXT1* pIoContext);//投递发送tcp数据请求
 
 		bool _PostRecvFrom(PER_IO_CONTEXT1* pIoContext);//投递udp接收数据请求
-		bool _DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threadNo, int curBufNo);//处理udp数据到达请求
+		bool _DoRecvFrom(PER_IO_CONTEXT1* pIoContext, int threadNo, int curBufNo, MySqlHandler* mysqlHandler);//处理udp数据到达请求
 		bool _PostSendTo(PER_IO_CONTEXT1* pIoContext);//投递发送udp数据请求
 
 		bool _DoAccept(PER_SOCKET_CONTEXT1* pSocketContext, PER_IO_CONTEXT1* pIoContext);//客户端连入处理
@@ -188,9 +189,12 @@ public:
 
 		//缓冲区三维数组指针
 		char*** bufferPtr;
+
+		//数据库连接指针
+		MySqlHandler** mysqlHandler;
 	};
 signals:
-	void serviceHandler(PER_IO_CONTEXT1* pIoContext, char* buff);
+	void serviceHandler(PER_IO_CONTEXT1* pIoContext, char* buff, MySqlHandler* mysqlHandler);
 private:
 	CIOCPModel1* m_IOCP;//完成端口模型
 };
@@ -198,4 +202,5 @@ private:
 typedef struct _tagThreadParams_WORKER1 {
 	IocpServer::CIOCPModel1* pIOCPModel;//类指针，用于调用类中的函数
 	int nThreadNo;//线程编号
+	MySqlHandler* mysqlHandler;
 }THREADPARAMS_WORKER1, *PTHREADPARAM_WORKER1;

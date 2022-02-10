@@ -11,7 +11,15 @@ public:
 	MySqlHandler();
 	~MySqlHandler();
 	bool connectDb();
-	bool queryDb(QString query,int resultNum,int& ack);
+
+	//通用查询
+	//ack:0执行失败,1成功
+	bool queryDb(QString query, int colNum, int& resultNum, int& ack);
+	
+	//查询最后一条记录的编号
+	bool queryDb(QString query, int colNum, int& resultNum, int& ack, int& maxRecordId);
+	//查询聊天记录
+	bool queryDb(QString query, int colNum, int& resultNum, int& ack, char* recordData );
 	bool queryDb(QString query, int& ack);
 	bool queryDb(QString query, QString& result);
 	void closeDb();

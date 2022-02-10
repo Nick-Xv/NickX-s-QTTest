@@ -17,7 +17,11 @@ enum SERVICE_TYPE {
 	POST_RECORD,
 	//CHECK
 	CHECK_PASSWORD,
-	CHECK_HEARTBEAT
+	CHECK_HEARTBEAT,
+	//SEND
+	SEND_RECORD,
+	SEND_RECORDS,
+	SEND_ACK
 };
 
 class UdpChatService : public QObject
@@ -34,10 +38,9 @@ protected:
 
 	//bool get
 public slots:
-void serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buf);
+void serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler);
 
 private:
-	MySqlHandler* mysqlHandler;
 	IocpServer* iocpServer;
 
 	HANDLE* HeartbeatThreadHandle;
@@ -46,18 +49,18 @@ private:
 
 	//找回密码
 	//void s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//获取聊天记录
-	void s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//发送消息
-	void s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//用户注册
-	void s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//检查密码
-	void s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf);
-	//心跳监测
-	void s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf);
+	//获取聊天记录***未测试
+	void s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler);
+	//发送消息***未测试
+	void s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler);
+	//用户注册tested
+	void s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler);
+	//检查密码***未测试
+	void s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler);
+	//心跳监测tested
+	void s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler);
 
-	//发送答复报文
-	void s_PostACK(PER_IO_CONTEXT1* pIoContext, int result);
+	//发送答复报文tested
+	void s_PostACK(PER_IO_CONTEXT1* pIoContext, int result, SERVICE_TYPE type);
 };
 
