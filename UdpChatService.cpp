@@ -51,21 +51,6 @@ void UdpChatService::closeService() {
 //服务分配处理
 void UdpChatService::serviceDispatcher(PER_IO_CONTEXT1* pIoContext, char* buff, MySqlHandler* mysqlHandler) {
 	SERVICE_TYPE type = (SERVICE_TYPE)(int)buff[0];
-	/*
-	qDebug() << (int)buff[0] << endl;
-	qDebug() << (int)buff[1] << endl;
-	qDebug() << (int)buff[2] << endl;
-	qDebug() << (int)buff[3] << endl; 
-	qDebug() << (int)buff[4] << endl;
-	qDebug() << (int)buff[5] << endl;
-	qDebug() << (int)buff[6] << endl;
-	qDebug() << (int)buff[7] << endl;
-	qDebug() << (int)buff[8] << endl;
-	qDebug() << (int)buff[9] << endl;
-	qDebug() << (int)buff[10] << endl;
-	qDebug() << (int)buff[11] << endl;
-	qDebug() << (int)buff[12] << endl;
-	*/
 	qDebug() << inet_ntoa(pIoContext->remoteAddr.sin_addr) << "!!!" << endl;
 	switch (type) {
 	/*case GET_PASSWORD:
@@ -147,7 +132,7 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 
 	//数据不完整直接返回false
 	if (beginPtr[1] == 0) {
-		s_PostACK(pIoContext, 0, SEND_ACK);
+		s_PostACK(pIoContext, 0, SEND_REGIST_ACK);
 		return;
 	}
 
@@ -170,11 +155,11 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 	mysqlHandler -> queryDb(query, 1, resultNum, ack);
 	//出现异常直接返回
 	if (ack == 0) {
-		s_PostACK(pIoContext, 2, SEND_ACK);
+		s_PostACK(pIoContext, 2, SEND_REGIST_ACK);
 	}
 	//用户名已存在
 	if (resultNum >= 1) {
-		s_PostACK(pIoContext, 1, SEND_ACK);
+		s_PostACK(pIoContext, 1, SEND_REGIST_ACK);
 	}
 	else {
 		//插入用户名和密码
@@ -186,7 +171,7 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		qDebug() << query << endl;
 		mysqlHandler->queryDb(query, ack);
 		if (ack == -1) ack = 2;
-		s_PostACK(pIoContext, ack, SEND_ACK);
+		s_PostACK(pIoContext, ack, SEND_REGIST_ACK);
 	}
 }
 
@@ -218,7 +203,7 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 
 	//数据不完整直接返回false
 	if (beginPtr[1] == 0) {
-		s_PostACK(pIoContext, 0, SEND_ACK);
+		s_PostACK(pIoContext, 0, SEND_RECORDS);
 		return;
 	}
 
@@ -233,7 +218,7 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 	int idRecords = atoi(idrecords);
 	//数据错误，房间号不能为0
 	if (roomID == 0) {
-		s_PostACK(pIoContext, 1, SEND_ACK);
+		s_PostACK(pIoContext, 1, SEND_RECORDS);
 		return;
 	}
 
@@ -261,7 +246,7 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 	if (idRecords == 0) {
 		//先把缓冲区置0
 		memset(pIoContext->m_szBuffer, 0, sizeof(pIoContext->m_szBuffer));
-		s_PostACK(pIoContext, 1, SEND_ACK);
+		s_PostACK(pIoContext, 1, SEND_RECORDS);
 		return;
 	}
 	//开始查询
@@ -306,7 +291,7 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 
 	//数据不完整直接返回false
 	if (beginPtr[1] == 0 || beginPtr[2] == 0) {
-		s_PostACK(pIoContext, 0, SEND_ACK);
+		s_PostACK(pIoContext, 0, SEND_RECORD);
 		return;
 	}
 
@@ -337,10 +322,9 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 	mysqlHandler->queryDb(query, ack);
 	//插入失败
 	if (ack != 3) {
-		s_PostACK(pIoContext, 2, SEND_ACK);
+		s_PostACK(pIoContext, 2, SEND_RECORD);
 	}
 	else {
-		s_PostACK(pIoContext, 1, SEND_ACK);
 		//开始发送给其他用户
 		//首先获取刚才插入的消息
 		QString lastID = nullptr;
@@ -360,6 +344,8 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		if (m_arrayClientContext[roomID]->size() >= 2) {//超过两人在线
 			for (iter = m_arrayClientContext[roomID]->begin(); iter != m_arrayClientContext[roomID]->end(); iter++) {
 				if (iter->first == userID) {//跳过本人
+					//本人也要发
+
 					continue;
 				}
 				else { 
@@ -399,7 +385,7 @@ void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MyS
 
 	//数据不完整直接返回false
 	if (beginPtr[1] == 0) {
-		s_PostACK(pIoContext, 0, SEND_ACK);
+		s_PostACK(pIoContext, 0, SEND_SIGNIN_ACK);
 		return;
 	}
 	char* userName = new char[endPtr[0] - beginPtr[0] + 1];
@@ -422,14 +408,14 @@ void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MyS
 
 	//出现异常直接返回
 	if (ack == 0) {
-		s_PostACK(pIoContext, 2, SEND_ACK);
+		s_PostACK(pIoContext, 2, SEND_SIGNIN_ACK);
 	}
 	//密码正确
 	if (resultNum >= 1) {
-		s_PostACK(pIoContext, 1, SEND_ACK);
+		s_PostACK(pIoContext, 1, SEND_SIGNIN_ACK);
 	}
 	else {//用户名密码有一个错误
-		s_PostACK(pIoContext, 3, SEND_ACK);
+		s_PostACK(pIoContext, 3, SEND_SIGNIN_ACK);
 	}
 }
 
@@ -458,7 +444,7 @@ void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf, My
 
 	//数据不完整直接返回false
 	if (beginPtr[1] == 0) {
-		s_PostACK(pIoContext, 0, SEND_ACK);
+		s_PostACK(pIoContext, 0, SEND_HEARTBEAT_ACK);
 		return;
 	}
 	char* userid = new char[endPtr[0] - beginPtr[0] + 1];
@@ -472,7 +458,7 @@ void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf, My
 	int userID = atoi(userid);
 	//数据获取错误，房间号不能为0
 	if (roomID == 0) {
-		s_PostACK(pIoContext, 0, SEND_ACK);
+		s_PostACK(pIoContext, 0, SEND_HEARTBEAT_ACK);
 		return;
 	}
 	//空指针时新建map
@@ -506,7 +492,7 @@ void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf, My
 			iter->second.second = 0;
 		}
 	}
-	s_PostACK(pIoContext, 1, SEND_ACK);
+	s_PostACK(pIoContext, 1, SEND_HEARTBEAT_ACK);
 }
 
 //心跳线程函数

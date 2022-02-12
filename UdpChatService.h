@@ -21,7 +21,10 @@ enum SERVICE_TYPE {
 	//SEND
 	SEND_RECORD,
 	SEND_RECORDS,
-	SEND_ACK
+	SEND_HEARTBEAT_ACK,
+	SEND_REGIST_ACK,
+	SEND_SIGNIN_ACK
+
 };
 
 class UdpChatService : public QObject
