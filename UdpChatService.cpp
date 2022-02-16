@@ -8,10 +8,10 @@
 UdpChatService::UdpChatService()
 {
 	if (initService()) {
-		QMessageBox::information(NULL, "信息", "服务器成功开启", QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+		QMessageBox::information(NULL, "信息", "服务器成功开启", QMessageBox::Yes, QMessageBox::Yes);
 	}
 	else {
-		QMessageBox::critical(NULL, "错误", "服务器打开失败", QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+		QMessageBox::critical(NULL, "错误", "服务器打开失败", QMessageBox::Yes, QMessageBox::Yes);
 	}
 }
 
