@@ -341,14 +341,9 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		memset(&recordData[0], 0, 8192);
 		mysqlHandler->queryDb(query, 5, resultNum, ack, &recordData[0]);
 		map<int, pair<PER_IO_CONTEXT1*, int>>::iterator iter;
-		if (m_arrayClientContext[roomID]->size() >= 2) {//超过两人在线
+		if (m_arrayClientContext[roomID]->size() >= 1) {//超过一人在线
 			for (iter = m_arrayClientContext[roomID]->begin(); iter != m_arrayClientContext[roomID]->end(); iter++) {
-				if (iter->first == userID) {//跳过本人
-					//本人也要发
-
-					continue;
-				}
-				else { 
+				{ 
 					//发送SENDTO
 					memcpy(iter->second.first->m_szBuffer, &recordData[0], 8192);
 					s_PostACK(iter->second.first, 1, SEND_RECORD); 
