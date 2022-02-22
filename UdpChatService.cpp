@@ -397,21 +397,27 @@ void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MyS
 
 	//查询用户名密码对应关系是否正确
 	QString query;
-	query = "select * from users where userName='";
+	query = "select userID from users where userName='";
 	query.append(userName);
 	query.append("' and userPassword='");
 	query.append(userPassword);
 	query.append("';");
 	qDebug() << query << endl;
 	int resultNum = -1, ack = -1;
-	mysqlHandler->queryDb(query, 1, resultNum, ack);
+	QString userid = " ";
+	mysqlHandler->queryDb(query, 1, resultNum, ack, userid);
 
 	//出现异常直接返回
-	if (ack == 0) {
+	if (ack == 0 || userid == " ") {
 		s_PostACK(pIoContext, 2, SEND_SIGNIN_ACK);
 	}
 	//密码正确
 	if (resultNum >= 1) {
+		//获取userid
+		QByteArray temp;
+		temp.append(userid);
+		char* useridChar = temp.data();
+		memcpy(&pIoContext->m_szBuffer[2], useridChar, sizeof(useridChar));
 		s_PostACK(pIoContext, 1, SEND_SIGNIN_ACK);
 	}
 	else {//用户名密码有一个错误

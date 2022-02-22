@@ -22,6 +22,9 @@ public:
 	bool queryDb(QString query, int colNum, int& resultNum, int& ack, char* recordData );
 	bool queryDb(QString query, int& ack);
 	bool queryDb(QString query, QString& result);
+
+	//检查密码正确，并且返回userid
+	bool queryDb(QString query, int colNum, int& resultNum, int& ack, QString& result);
 	void closeDb();
 private:
 	MYSQL* mysql;//mysql连接

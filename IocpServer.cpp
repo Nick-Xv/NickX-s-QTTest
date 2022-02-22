@@ -864,7 +864,7 @@ void IocpServer::CIOCPModel1::_AddToContextList(PER_SOCKET_CONTEXT1 *pHandleData
 
 void IocpServer::SendDataTo(PER_IO_CONTEXT1* pIoContext) {
 	pIoContext->m_OpType = SENDTO_POST;
-	qDebug() << pIoContext->m_szBuffer << endl;
+	//qDebug() << pIoContext->m_szBuffer << endl;
 	m_IOCP->SendDataTo(pIoContext);
 }
 

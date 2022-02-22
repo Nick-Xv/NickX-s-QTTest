@@ -199,6 +199,52 @@ bool MySqlHandler::queryDb(QString query, QString& result) {
 	return true;
 }
 
+//检查密码正确，并且返回userid
+//colNum: 结果列数
+//resultNum：结果行数
+//ack：查询结果状态
+//0:查询失败
+//1:查询成功
+bool MySqlHandler::queryDb(QString query, int colNum, int& resultNum, int& ack, QString& userid) {
+	sprintf_s(this->query, query.toUtf8());
+	if (mysql_query(mysql, this->query)) {
+		qDebug() << "query failed " << mysql_error(mysql) << endl;
+		ack = 0;
+		return false;
+	}
+	else {
+		qDebug() << "query success" << endl;
+	}
+	//获取结果集
+	if (!(res = mysql_store_result(mysql))) {
+		qDebug() << "can't get result" << endl;
+		ack = 0;
+		return false;
+	}
+
+	qDebug() << "number of dataline returned: " << mysql_affected_rows(mysql) << endl;
+	resultNum = mysql_affected_rows(mysql);
+	ack = 1;
+
+	if (resultNum >= 1) {
+		column = mysql_fetch_row(res);
+		userid = column[0];
+	}
+	/*
+	char* str_field[32];
+	for (int i = 0; i < resultNum; i++) {
+	str_field[i] = mysql_fetch_field(res)->name;
+	qDebug() << str_field[i] << endl;
+	}
+	while (column = mysql_fetch_row(res)) {
+	for (int i = 0; i < resultNum; i++) {
+	qDebug() << column[i] << endl;
+	}
+	}
+	*/
+	return true;
+}
+
 void MySqlHandler::closeDb() {
 	if (mysql != nullptr) {
 		mysql_close(mysql);
