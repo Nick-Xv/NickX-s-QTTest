@@ -15,7 +15,7 @@ extern enum SERVICE_TYPE;
 
 const int MAX_BUFFER_LEN1 = 8192;//缓冲区长度
 const int BUFFER_TEMP_LEN1 = 50;
-const int DEFAULT_PORT1 = 1000;//默认端口
+const int DEFAULT_PORT1 = 1001;//默认端口
 
 //const string DEFAULT_IP1 = "127.0.0.1";//默认IP地址
 

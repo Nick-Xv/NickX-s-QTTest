@@ -32,5 +32,5 @@ private:
 	char field[32][32];//存字段名
 	MYSQL_RES* res;//返回行的一个查询结果集
 	MYSQL_ROW column;//表示数据行的列
-	char query[150];//查询语句
+	char query[300];//查询语句
 };

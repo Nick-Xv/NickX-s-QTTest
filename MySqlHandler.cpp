@@ -102,8 +102,13 @@ bool MySqlHandler::queryDb(QString query, int colNum, int& resultNum, int& ack, 
 
 	if (resultNum != 0) {//查到了聊天记录
 		column = mysql_fetch_row(res);
-		qDebug() << column[0] << endl;
-		maxRecordId = atoi(column[0]);
+		if (column[0] == NULL) {
+			qDebug() << "NULL" << endl;
+		}
+		else {
+			qDebug() << column[0] << endl;
+			maxRecordId = atoi(column[0]);
+		}
 	}
 	return true;
 }

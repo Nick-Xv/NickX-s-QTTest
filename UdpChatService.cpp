@@ -218,7 +218,7 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 	int idRecords = atoi(idrecords);
 	//数据错误，房间号不能为0
 	if (roomID == 0) {
-		s_PostACK(pIoContext, 1, SEND_RECORDS);
+		s_PostACK(pIoContext, 0, SEND_RECORDS);
 		return;
 	}
 
@@ -233,13 +233,14 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 	int maxRecordId = -1;
 	if (idRecords == 0) {
 		query = "select max(idrecords) from records where roomid=";
-		query.append(roomID);
+		query.append(roomid);
 		query.append(";");
 		qDebug() << query << endl;
 		mysqlHandler->queryDb(query, 1, resultNum, ack, maxRecordId);
 		//查到了最大记录编号
 		if (maxRecordId != -1) {
-			idRecords = maxRecordId;
+			//+1为了获取全部的消息，因为查询语句用的<
+			idRecords = maxRecordId + 1;
 		}
 	}
 	//此时表示没有聊天记录
@@ -249,16 +250,18 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 		s_PostACK(pIoContext, 1, SEND_RECORDS);
 		return;
 	}
+	QString idrecordQString = QString::number(idRecords);
+	QByteArray temp;
+	temp.append(idrecordQString);
+	char* idrecordChar = temp.data();
 	//开始查询
-	query = "select * from records where roomid=";
-	query.append(roomID);
-	query.append(" and (idrecords between ");
-	query.append(idRecords - 20);
-	query.append(" and ");
-	query.append(idRecords);
-	query.append(");");
+	query = "select records.*, users.userName from records left join users on records.userid=users.userID where records.roomid=";
+	query.append(roomid);
+	query.append(" and records.idrecords < ");
+	query.append(idrecordChar);
+	query.append(" order by records.idrecords desc limit 20;");
 	qDebug() << query << endl;
-	mysqlHandler->queryDb(query, 5, resultNum, ack, &recordData[0]);
+	mysqlHandler->queryDb(query, 6, resultNum, ack, &recordData[0]);
 	memcpy(pIoContext->m_szBuffer, &recordData[0], sizeof(pIoContext->m_szBuffer));
 	s_PostACK(pIoContext, 1, SEND_RECORDS);
 }
@@ -331,7 +334,7 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		mysqlHandler->queryDb("SELECT LAST_INSERT_ID();", lastID);
 		qDebug() << lastID << endl;
 		//然后获取刚才插入的完整内容
-		query = "select * from records where idrecords=";
+		query = "select records.*, users.userName from records left join users on records.userid=users.userID where records.idrecords=";
 		query.append(lastID);
 		query.append(";");
 		qDebug() << query << endl;
@@ -339,7 +342,7 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		int resultNum = -1;
 		char recordData[8192];
 		memset(&recordData[0], 0, 8192);
-		mysqlHandler->queryDb(query, 5, resultNum, ack, &recordData[0]);
+		mysqlHandler->queryDb(query, 6, resultNum, ack, &recordData[0]);
 		map<int, pair<PER_IO_CONTEXT1*, int>>::iterator iter;
 		if (m_arrayClientContext[roomID]->size() >= 1) {//超过一人在线
 			for (iter = m_arrayClientContext[roomID]->begin(); iter != m_arrayClientContext[roomID]->end(); iter++) {
