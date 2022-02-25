@@ -108,21 +108,30 @@ void UdpChatService::s_GetPassword(PER_IO_CONTEXT1* pIoContext, char* buff) {
 */
 
 //用户注册 包括查询用户名和插入用户名密码
-//buf[5]到第一个0，username
-//后面到0，password
+//args:
+//1.service type
+//2.id_cur
+//3.id_all
+//4.username
+//5.password
 //ACK值：0-数据错误
 //		 1-用户名已存在
 //		 2-数据库错误
 //		 3-插入成功
 void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler) {
 	//获取username和password
-	int i = 5;
-	int beginPtr[2] = { 0 };
-	int endPtr[2] = { 0 };
+	int i = 0;
+	int beginPtr[5] = { 0 };
+	int endPtr[5] = { 0 };
 	int num = 0;
 	beginPtr[num] = i;
 	while (buf[i] != 0 || buf[i + 1] != 0) {
 		if (buf[i] == 0) {
+			if (num == 4) {
+				//返回数据错误
+				s_PostACK(pIoContext, 0, SEND_REGIST_ACK);
+				break;
+			}
 			endPtr[num] = i;
 			beginPtr[++num] = i + 1;
 		}
@@ -136,12 +145,12 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		return;
 	}
 
-	char* username = new char[endPtr[0] - beginPtr[0] + 1];
-	char* password = new char[endPtr[1] - beginPtr[1] + 1];
-	memset(username, 0, endPtr[0] - beginPtr[0] + 1);
-	memset(password, 0, endPtr[1] - beginPtr[1] + 1);
-	memcpy(username, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
-	memcpy(password, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
+	char* username = new char[endPtr[3] - beginPtr[3] + 1];
+	char* password = new char[endPtr[4] - beginPtr[4] + 1];
+	memset(username, 0, endPtr[3] - beginPtr[3] + 1);
+	memset(password, 0, endPtr[4] - beginPtr[4] + 1);
+	memcpy(username, &buf[beginPtr[3]], endPtr[3] - beginPtr[3]);
+	memcpy(password, &buf[beginPtr[4]], endPtr[4] - beginPtr[4]);
 
 	//查询数据库的username
 	QString query;
@@ -178,8 +187,12 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 //获取聊天记录 
 //一次扩展20条
 //通过提供的roomid和当前查询过的最后一条idrecords
-//buf[5]到第一个0，roomid
-//再到0，idrecords
+//args:
+//1.service type
+//2.id_cur
+//3.id_all
+//4.roomid
+//5.idrecords
 //ACK值：0-数据错误
 //		 1-查询成功
 //		 2-数据库错误
@@ -187,13 +200,18 @@ void UdpChatService::s_PostRegist(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 //缓冲区结尾标记两字节0
 void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler) {
 	//获取roomid和idrecords
-	int i = 5;
-	int beginPtr[2] = { 0 };
-	int endPtr[2] = { 0 };
+	int i = 0;
+	int beginPtr[5] = { 0 };
+	int endPtr[5] = { 0 };
 	int num = 0;
 	beginPtr[num] = i;
 	while (buf[i] != 0 || buf[i + 1] != 0) {
 		if (buf[i] == 0) {
+			if (num == 4) {
+				//返回数据错误
+				s_PostACK(pIoContext, 0, SEND_RECORDS);
+				break;
+			}
 			endPtr[num] = i;
 			beginPtr[++num] = i + 1;
 		}
@@ -207,12 +225,12 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 		return;
 	}
 
-	char* roomid = new char[endPtr[0] - beginPtr[0] + 1];
-	char* idrecords = new char[endPtr[1] - beginPtr[1] + 1];
-	memset(roomid, 0, endPtr[0] - beginPtr[0] + 1);
-	memset(idrecords, 0, endPtr[1] - beginPtr[1] + 1);
-	memcpy(roomid, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
-	memcpy(idrecords, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
+	char* roomid = new char[endPtr[3] - beginPtr[3] + 1];
+	char* idrecords = new char[endPtr[4] - beginPtr[4] + 1];
+	memset(roomid, 0, endPtr[3] - beginPtr[3] + 1);
+	memset(idrecords, 0, endPtr[4] - beginPtr[4] + 1);
+	memcpy(roomid, &buf[beginPtr[3]], endPtr[3] - beginPtr[3]);
+	memcpy(idrecords, &buf[beginPtr[4]], endPtr[4] - beginPtr[4]);
 
 	int roomID = atoi(roomid);
 	int idRecords = atoi(idrecords);
@@ -269,22 +287,31 @@ void UdpChatService::s_GetRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHa
 
 //发送消息，并且发给当前聊天室中的所有用户处
 //提供roomid, userid, content
-//buf[5]到第一个0，roomid
-//再到0，userid
-//再到0，content
+//args:
+//1.service type
+//2.id_cur
+//3.id_all
+//4.roomid
+//5.userid
+//6.content
 //ACK值：0-数据错误
 //		 1-插入成功
 //		 2-数据库错误
 //缓冲区结尾标记两字节0
 void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler) {
 	//获取roomid, userid, content
-	int i = 5;
-	int beginPtr[3] = { 0 };
-	int endPtr[3] = { 0 };
+	int i = 0;
+	int beginPtr[6] = { 0 };
+	int endPtr[6] = { 0 };
 	int num = 0;
 	beginPtr[num] = i;
 	while (buf[i] != 0 || buf[i + 1] != 0) {
 		if (buf[i] == 0) {
+			if (num == 5) {
+				//返回数据错误
+				s_PostACK(pIoContext, 0, SEND_RECORD);
+				break;
+			}
 			endPtr[num] = i;
 			beginPtr[++num] = i + 1;
 		}
@@ -298,15 +325,15 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 		return;
 	}
 
-	char* roomid = new char[endPtr[0] - beginPtr[0] + 1];
-	char* userid = new char[endPtr[1] - beginPtr[1] + 1];
-	char* content = new char[endPtr[2] - beginPtr[2] + 1];
-	memset(roomid, 0, endPtr[0] - beginPtr[0] + 1);
-	memset(userid, 0, endPtr[1] - beginPtr[1] + 1);
-	memset(content, 0, endPtr[2] - beginPtr[2] + 1);
-	memcpy(roomid, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
-	memcpy(userid, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
-	memcpy(content, &buf[beginPtr[2]], endPtr[2] - beginPtr[2]);
+	char* roomid = new char[endPtr[3] - beginPtr[3] + 1];
+	char* userid = new char[endPtr[4] - beginPtr[4] + 1];
+	char* content = new char[endPtr[5] - beginPtr[5] + 1];
+	memset(roomid, 0, endPtr[3] - beginPtr[3] + 1);
+	memset(userid, 0, endPtr[4] - beginPtr[4] + 1);
+	memset(content, 0, endPtr[5] - beginPtr[5] + 1);
+	memcpy(roomid, &buf[beginPtr[3]], endPtr[3] - beginPtr[3]);
+	memcpy(userid, &buf[beginPtr[4]], endPtr[4] - beginPtr[4]);
+	memcpy(content, &buf[beginPtr[5]], endPtr[5] - beginPtr[5]);
 
 	int roomID = atoi(roomid);
 	int userID = atoi(userid);
@@ -358,8 +385,12 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 
 //检查密码正确
 //提供userName, userPassword
-//buf[5]到第一个0，userName
-//再到0，userPassword
+//args:
+//1.service type
+//2.id_cur
+//3.id_all
+//4.userName
+//5.userPassword
 //ACK值：0-数据错误
 //		 1-密码正确
 //		 2-数据库错误
@@ -367,13 +398,18 @@ void UdpChatService::s_PostRecord(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlH
 //缓冲区结尾标记两字节0
 void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler) {
 	//获取userName和userPassword
-	int i = 5;
-	int beginPtr[2] = { 0 };
-	int endPtr[2] = { 0 };
+	int i = 0;
+	int beginPtr[5] = { 0 };
+	int endPtr[5] = { 0 };
 	int num = 0;
 	beginPtr[num] = i;
 	while (buf[i] != 0 || buf[i + 1] != 0) {
 		if (buf[i] == 0) {
+			if (num == 4) {
+				//返回数据错误
+				s_PostACK(pIoContext, 0, SEND_SIGNIN_ACK);
+				break;
+			}
 			endPtr[num] = i;
 			beginPtr[++num] = i + 1;
 		}
@@ -386,12 +422,12 @@ void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MyS
 		s_PostACK(pIoContext, 0, SEND_SIGNIN_ACK);
 		return;
 	}
-	char* userName = new char[endPtr[0] - beginPtr[0] + 1];
-	char* userPassword = new char[endPtr[1] - beginPtr[1] + 1];
-	memset(userName, 0, endPtr[0] - beginPtr[0] + 1);
-	memset(userPassword, 0, endPtr[1] - beginPtr[1] + 1);
-	memcpy(userName, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
-	memcpy(userPassword, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
+	char* userName = new char[endPtr[3] - beginPtr[3] + 1];
+	char* userPassword = new char[endPtr[4] - beginPtr[4] + 1];
+	memset(userName, 0, endPtr[3] - beginPtr[3] + 1);
+	memset(userPassword, 0, endPtr[4] - beginPtr[4] + 1);
+	memcpy(userName, &buf[beginPtr[3]], endPtr[3] - beginPtr[3]);
+	memcpy(userPassword, &buf[beginPtr[4]], endPtr[4] - beginPtr[4]);
 
 	//查询用户名密码对应关系是否正确
 	QString query;
@@ -425,20 +461,29 @@ void UdpChatService::s_CheckPassword(PER_IO_CONTEXT1* pIoContext, char* buf, MyS
 
 //心跳监测
 //提供userid,roomid
-//buf[5]到第一个0，userid
-//再到0，roomid
+//args:
+//1.service type
+//2.id_cur
+//3.id_all
+//4.userid
+//5.roomid
 //ACK值：0-数据错误
 //		 1-正确接收
 //缓冲区结尾标记两字节0
 void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf, MySqlHandler* mysqlHandler) {
 	//获取userid和roomid
-	int i = 5;
-	int beginPtr[2] = { 0 };
-	int endPtr[2] = { 0 };
+	int i = 0;
+	int beginPtr[5] = { 0 };
+	int endPtr[5] = { 0 };
 	int num = 0;
 	beginPtr[num] = i;
-	while (buf[i] != 0 || buf[i+1] != 0) {
+	while (buf[i] != 0 || buf[i + 1] != 0) {
 		if (buf[i] == 0) {
+			if (num == 4) {
+				//返回数据错误
+				s_PostACK(pIoContext, 0, SEND_HEARTBEAT_ACK);
+				break;
+			}
 			endPtr[num] = i;
 			beginPtr[++num] = i + 1;
 		}
@@ -451,12 +496,12 @@ void UdpChatService::s_CheckHeartbeat(PER_IO_CONTEXT1* pIoContext, char* buf, My
 		s_PostACK(pIoContext, 0, SEND_HEARTBEAT_ACK);
 		return;
 	}
-	char* userid = new char[endPtr[0] - beginPtr[0] + 1];
-	char* roomid = new char[endPtr[1] - beginPtr[1] + 1];
-	memset(userid, 0, endPtr[0] - beginPtr[0] + 1);
-	memset(roomid, 0, endPtr[1] - beginPtr[1] + 1);
-	memcpy(userid, &buf[beginPtr[0]], endPtr[0] - beginPtr[0]);
-	memcpy(roomid, &buf[beginPtr[1]], endPtr[1] - beginPtr[1]);
+	char* userid = new char[endPtr[3] - beginPtr[3] + 1];
+	char* roomid = new char[endPtr[4] - beginPtr[4] + 1];
+	memset(userid, 0, endPtr[3] - beginPtr[3] + 1);
+	memset(roomid, 0, endPtr[4] - beginPtr[4] + 1);
+	memcpy(userid, &buf[beginPtr[3]], endPtr[3] - beginPtr[3]);
+	memcpy(roomid, &buf[beginPtr[4]], endPtr[4] - beginPtr[4]);
 
 	int roomID = atoi(roomid);
 	int userID = atoi(userid);
